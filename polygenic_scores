@@ -12,11 +12,9 @@
    ## Antidepressant response (PMID: 35712048)
     # Antidepressant response (non-remission; ADnorem) - EUR
     # Antidepressant response (percentage improvement; ADperc) - EUR
+
 #########################################################################
-### Created: 20240423 by Ollie Pain 
-#########################################################################
-#########################################################################
-### Written in bash from here
+### GENERATE POLYGENIC SCORES [code from Ollie Pain]
 #########################################################################
 
 #########################################################################
@@ -203,6 +201,63 @@ for(i in names(pgs)){
 }
 
 saveRDS(pgs, '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/ukb82087/psych_demo.pgs.megaprs.ukb82087.RDS')
+
+#########################################################################
+### ASSOCIATION TESTING 
+#########################################################################
+## Move to the correct directory 
+cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
+
+## Set up interactive session
+srun -p cpu --mem=80G --pty /bin/bash
+
+## Set up R session and load libraries
+module add r 
+R
+```{r library, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+.libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
+library(broom)
+library(data.table) 
+library(tidyverse) 
+library(ggplot2) 
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(vroom)
+library(readr)
+library(gtsummary)
+library(e1071)
+library(forcats)
+library(UpSetR)
+library(cowplot)
+library(gt)
+library(gmodels)
+library(car)
+library(psych)
+library(fmsb)
+```
+
+
+```{r df_setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Read in file
+ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.rds")
+
+
+# Verify dataset
+print(table(ukb_adresponse_dat_analysis_full$Citalopram)) #6899 + 1436
+print(table(ukb_adresponse_dat_analysis_full$Fluoxetine)) #6624 + 1852
+print(table(ukb_adresponse_dat_analysis_full$Paroxetine)) #1763 + 534 
+print(table(ukb_adresponse_dat_analysis_full$Sertraline)) #4693 + 1190
+print(table(ukb_adresponse_dat_analysis_full$sex)) #50655 + 25871
+print(table(ukb_adresponse_dat_analysis_full$ethnic_background)) #74276
+
+```
+
+
 
 
 
