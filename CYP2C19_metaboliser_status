@@ -176,7 +176,7 @@ covariates <- c("age", "sex", "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "Batch")
  subset_data <- ukb_response_cyp2c_df[ukb_response_cyp2c_df$ethnic_background == "White", ]
 
 #########################################################################
-### Univariate analysis
+### Univariable analysis
 #########################################################################
 ### Citalopram 
 ### Initialize dataframe to store all results
