@@ -1,15 +1,5 @@
 # Predictors-of-Self-reported-SSRI-response
-This repository contains the code related to the project exploring sociodemographic, clinical, and genetic predictors of selective serotonin reuptake inhibitor (SSRI) response in individuals with Major Depressive Disorder (MDD). The study focuses on participants from the Mental Health Questionnaire (MHQ2) of the UK Biobank (UKB) who have reported using at least one SSRI (citalopram, fluoxetine, paroxetine, or sertraline) to manage their depressive symptoms.
-
-# Project Overview
-Our analysis aims to identify predictors that can influence the effectiveness of SSRI treatment in managing the cardinal symptoms of MDD. This project specifically investigates:
-
-- **Sociodemographic factors**: Are sociodemographic variables associated with SSRI non-reponse?
-- **Clinical factors**: Are MDD symptoms and clinical characteristics assciated with SSRI non-response?
-- **Genetic factors**: Are genetic factors, specifically CYP2C19 metabolizer status and polygenic scores (five psychiatric conditions and two antidepressant response phenotypes) associated with SSRI non-response? 
-
-# Data Source
-The dataset used in this analysis is derived from UKB, particularly focusing on those individuals who have participated in the Mental Health Questionnaire (MHQ2) and have a history of SSRI usage.
+This branch contains the code related to the derivation and assocaition testing of sociodemographic, clinical and genetic factors of selective serotonin reuptake inhibitor (SSRI) response in the Mental Health Questionnaire (MHQ2) of the UK Biobank (UKB).
 
 ## Sociodemographic variables: 
 Variables include age, sex, ethnicity, educational attainment, household income, and neighborhood deprivation. Variables collected at baseline UKB assessment. 
