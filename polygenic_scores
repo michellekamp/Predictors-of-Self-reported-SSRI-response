@@ -1,1 +1,171 @@
+#########################################################################
+### Code used to derive Polygenic scores (PGS) in the UK Biobank 
+### Scores calculated using GenoPred pipeline, specifically the MegaPRS approach
+### Target data input: target data: UKB imputed genetic data on HPC
+### Base GWAS data input: GWAS summary stats downloaded from the Psychiatric Genomics Consortium (PGC) 
+  ## Psychiatric conditions 
+    # Major depressive disorder - DEPR07 - PMID: 29700475 (excl. UKB and 23andMe)
+    # Schizophrenia - SCHI04 - PMID: 29483656
+    # Bipolar Disorder - BIPO02 - PMID: 31043756
+    # ADHD - ADHD05 - PMID: 30478444 (EUR only)
+    # Autism - AUTI07 - PMID: 30804558
+   ## Antidepressant response (PMID: 35712048)
+    # Antidepressant response (non-remission; ADnorem) - EUR
+    # Antidepressant response (percentage improvement; ADperc) - EUR
+#########################################################################
+### Created: 20240423 by Ollie Pain 
+#########################################################################
 
+
+### Collate GWAS summstats
+for gwas in $(echo DEPR07 SCHI04 BIPO02 ADHD05 AUTI07); do
+  ln -s /scratch/prj/gwas_sumstats/cleaned/${gwas}.gz /scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/${gwas}.gz
+done
+
+wget --no-check-certificate -O /scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/AntiDepNonRemissionEUR2021.gz https://figshare.com/ndownloader/files/31424416
+wget --no-check-certificate -O /scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/AntiDepPercImprovEUR2021.gz https://figshare.com/ndownloader/files/31424437
+#########################################################################
+### Prepare configuration
+dir.create('/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/configs/psych_demo') 
+
+# gwas_list
+gwas_list<-NULL
+
+gwas_list <- rbind(
+  gwas_list,
+  data.frame(
+    name = 'DEPR07',
+    path = '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/DEPR07.gz',
+    population = 'EUR',
+    n = NA,
+    sampling = 0.34,
+    prevalence = 0.15,
+    mean = NA,
+    sd = NA,
+    label = 'Major Depression'
+  )
+)
+
+gwas_list <- rbind(
+  gwas_list,
+  data.frame(
+    name = 'SCHI04',
+    path = '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/SCHI04.gz',
+    population = 'EUR',
+    n = NA,
+    sampling = 0.39,
+    prevalence = 0.01,
+    mean = NA,
+    sd = NA,
+    label = 'Schizophrenia'
+  )
+)
+
+gwas_list <- rbind(
+  gwas_list,
+  data.frame(
+    name = 'BIPO02',
+    path = '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/BIPO02.gz',
+    population = 'EUR',
+    n = NA,
+    sampling = 0.39,
+    prevalence = 0.01,
+    mean = NA,
+    sd = NA,
+    label = 'Bipolar disorder'
+  )
+)
+
+gwas_list <- rbind(
+  gwas_list,
+  data.frame(
+    name = 'ADHD05',
+    path = '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/ADHD05.gz',
+    population = 'EUR',
+    n = NA,
+    sampling = 0.36,
+    prevalence = 0.05,
+    mean = NA,
+    sd = NA,
+    label = 'ADHD'
+  )
+)
+
+gwas_list <- rbind(
+  gwas_list,
+  data.frame(
+    name = 'AUTI07',
+    path = '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/AUTI07.gz',
+    population = 'EUR',
+    n = NA,
+    sampling = 0.40,
+    prevalence = 0.01,
+    mean = NA,
+    sd = NA,
+    label = 'Autism'
+  )
+)
+
+gwas_list <- rbind(
+  gwas_list,
+  data.frame(
+    name = 'ADnorem',
+    path = '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/AntiDepNonRemissionEUR2021.gz',
+    population = 'EUR',
+    n = NA,
+    sampling = 0.36,
+    prevalence = 0.36,
+    mean = NA,
+    sd = NA,
+    label = 'AD non-rem.'
+  )
+)
+
+gwas_list <- rbind(
+  gwas_list,
+  data.frame(
+    name = 'ADperc',
+    path = '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/AntiDepPercImprovEUR2021.gz',
+    population = 'EUR',
+    n = NA,
+    sampling = NA,
+    prevalence = NA,
+    mean = 0,
+    sd = 1,
+    label = 'AD perc. improv.'
+  )
+)
+
+# Put labels in quotes so they are read as a single string
+gwas_list$label<-paste0("\"", gwas_list$label, "\"")
+
+write.table(gwas_list, '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/configs/psych_demo/gwas_list.txt', col.names=T, row.names=F, quote=F)
+
+# target_list
+target_list <- data.frame(
+  name='ukb',
+  path='/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/ukb_symlinks/ukb_imp_maf1_info4',
+  type='plink2',
+  indiv_report=F
+)
+
+write.table(target_list, '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/configs/psych_demo/target_list.txt', col.names=T, row.names=F, quote=F)
+
+# configfile
+conf <- c(
+  'outdir: /scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/output',
+  'config_file: /scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/configs/psych_demo/config.yaml',
+  'gwas_list: /scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/configs/psych_demo/gwas_list.txt',
+  'target_list: /scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/configs/psych_demo/target_list.txt',
+  "pgs_methods: ['ldpred2','ptclump']",
+  "ldpred2_model: ['auto']"
+)
+
+write.table(conf, '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/configs/psych_demo/config.yaml', col.names = F, row.names = F, quote = F)
+#########################################################################
+### Run GenoPred
+cd /scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/GenoPred/pipeline
+git describe --tags # v2.2.3-3-gda8acad
+snakemake --profile slurm --use-conda --configfile=../../usr/k1806347/configs/psych_demo/config.yaml output_all -n 
+#########################################################################
+### Link output to specific project
