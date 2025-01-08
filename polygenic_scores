@@ -205,19 +205,23 @@ saveRDS(pgs, '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/uk
 #########################################################################
 ### ASSOCIATION TESTING 
 #########################################################################
-## Move to the correct directory 
-cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
-
-## Set up interactive session
+#########################################################################
+### Preamble
+#########################################################################
+### ssh into create
+### Request interactive session
 srun -p cpu --mem=80G --pty /bin/bash
-
-## Set up R session and load libraries
+### Change directory
+cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
+### Launch R
 module add r 
 R
-```{r library, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
+#########################################################################
+### Written in R from here
+#########################################################################
+### Set library path
 .libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
+### Load necessary libraries
 library(broom)
 library(data.table) 
 library(tidyverse) 
@@ -237,29 +241,115 @@ library(gmodels)
 library(car)
 library(psych)
 library(fmsb)
-```
-
-
-```{r df_setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
-# Read in file
+#########################################################################
+### Set up paths
+pgx_path <- "/datasets/ukbiobank/ukb82087/returns/FFR_33722_1/pgx_calls.imputed_callset_DAedit.csv"
+id_path <- "/datasets/ukbiobank/ukb82087/returns/ukb82087bridge33722.txt"
+### Read in files...
 ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.rds")
 
-
 # Verify dataset
-print(table(ukb_adresponse_dat_analysis_full$Citalopram)) #6899 + 1436
-print(table(ukb_adresponse_dat_analysis_full$Fluoxetine)) #6624 + 1852
-print(table(ukb_adresponse_dat_analysis_full$Paroxetine)) #1763 + 534 
-print(table(ukb_adresponse_dat_analysis_full$Sertraline)) #4693 + 1190
-print(table(ukb_adresponse_dat_analysis_full$sex)) #50655 + 25871
-print(table(ukb_adresponse_dat_analysis_full$ethnic_background)) #74276
+print(table(ukb_adresponse_dat_analysis_full$Citalopram)) 
+print(table(ukb_adresponse_dat_analysis_full$Fluoxetine)) 
+print(table(ukb_adresponse_dat_analysis_full$Paroxetine)) 
+print(table(ukb_adresponse_dat_analysis_full$Sertraline)) 
+print(table(ukb_adresponse_dat_analysis_full$sex)) 
+print(table(ukb_adresponse_dat_analysis_full$ethnic_background)) 
 
-```
+#########################################################################
+### Set up association analysis parameters
+### Define the predictors
+predictors <- c("DEPR07_EUR", "ADHD05_EUR", "AUTI07_EUR", "BIPO02_EUR", "SCHI04_EUR", "ADnorem_EUR", "ADperc_EUR")
+### Define the covariates
+covariates <- c("age", "sex", "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "Batch")
+### Subset data for White ethnic background
+ subset_data <- ukb_adresponse_dat_analysis_full[ukb_adresponse_dat_analysis_full$ethnic_background == "White", ]
+### Sanity check  
+print(table(subset_data$Citalopram)) 
+print(table(subset_data$Fluoxetine)) 
+print(table(subset_data$Paroxetine)) 
+print(table(subset_data$Sertraline)) 
+print(table(subset_data$sex)) 
+print(table(subset_data$ethnic_background)) 
+  
+#########################################################################
+### Run association analysis parameters
 
+###  Sertraline
+# Initialize dataframe to store all results
+all_univariate_prs_ser <- data.frame()
 
+for (predictor in predictors) {
+# Create formula string with scaled predictors and covariates
+  full_formula_str <- paste("Sertraline ~ scale(", predictor, ") + ", paste(covariates, collapse=" + "))
+  full_formula <- as.formula(full_formula_str)
+  
+  null_formula_str <- paste("Sertraline ~ ", paste(covariates, collapse=" + "))
+  null_formula <- as.formula(null_formula_str)
+  
 
+# Fit logistic regression model on the subset data
+  model_ser_full <- glm(full_formula, family = binomial, data = subset_data)
+  
+  model_ser_null <- glm(null_formula, family = binomial, data = subset_data)
+  
+   # Calculate Nagelkerke R2 for both models
+  nagelkerke_full <- NagelkerkeR2(model_ser_full)
+  nagelkerke_null <- NagelkerkeR2(model_ser_null)
+  
+  
+ # Retrieve number of observations used in the model for each category of Sertraline
+  Nyes <- sum(subset_data$Sertraline == "Yes", na.rm = TRUE)
+  Nno <- sum(subset_data$Sertraline == "No", na.rm = TRUE)
+  
+  
+  # Calculate the phenotypic variance explained by the predictor
+  nagelkerke_full <- NagelkerkeR2(model_ser_full)
+  nagelkerke_null <- NagelkerkeR2(model_ser_null)
+  
+ # Extract R2 values
+  nagelkerke_fullR2 = nagelkerke_full$R2
+  nagelkerke_nullR2 = nagelkerke_null$R2
+  
+  # Calculate phenotypic variance explained
+  R2_diff = nagelkerke_fullR2 - nagelkerke_nullR2
+  
 
+# Calculate Odds Ratios and Confidence Intervals, including significance
+   tidy_model_ser <- broom::tidy(model_ser_full) %>%
+    mutate(
+      Drug = "Sertraline",
+      Predictor = predictor,  # Add predictor name for reference
+      OR = exp(estimate),
+      lowerCI = exp(estimate - 1.96 * std.error),
+      upperCI = exp(estimate + 1.96 * std.error),
+      logOR = estimate,
+      logLowerCI = estimate - 1.96 * std.error,
+      logUpperCI = estimate + 1.96 * std.error,
+      Significance = ifelse(p.value < 0.05, "Significant", "Not Significant"), 
+      NagelkerkeFullR2 = nagelkerke_fullR2,
+      NagelkerkeNullR2 = nagelkerke_nullR2,
+      R2_diff = R2_diff,
+      Nyes = Nyes,
+      Nno = Nno
+    )
+  
+# Append the tidy model results to the results data frame
+  all_univariate_prs_ser <- rbind(all_univariate_prs_ser, tidy_model_ser)
+}
+
+## Correct for multiple testing 
+
+alpha <- 0.05
+number_tests <- length(predictors)
+adjusted_alpha <- alpha/number_tests
+
+all_univariate_prs_ser$corrected_significance <- ifelse(all_univariate_prs_ser$p.value < adjusted_alpha, "Significant", "Not Significant")
+
+number_tests_max <- length(predictors)*6
+adjusted_alpha_max <- alpha/number_tests_max
+
+all_univariate_prs_ser$corrected_significance_max <- ifelse(all_univariate_prs_ser$p.value < adjusted_alpha_max, "Significant", "Not Significant")
 
 
 
