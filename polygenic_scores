@@ -15,8 +15,11 @@
 #########################################################################
 ### Created: 20240423 by Ollie Pain 
 #########################################################################
+#########################################################################
+### Written in bash from here
+#########################################################################
 
-
+#########################################################################
 ### Collate GWAS summstats
 for gwas in $(echo DEPR07 SCHI04 BIPO02 ADHD05 AUTI07); do
   ln -s /scratch/prj/gwas_sumstats/cleaned/${gwas}.gz /scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/gwas_sumstats/${gwas}.gz
@@ -169,3 +172,49 @@ git describe --tags # v2.2.3-3-gda8acad
 snakemake --profile slurm --use-conda --configfile=../../usr/k1806347/configs/psych_demo/config.yaml output_all -n 
 #########################################################################
 ### Link output to specific project
+
+# Load required libraries and functions
+setwd('/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/GenoPred/pipeline/')
+library(data.table)
+library(ggplot2)
+library(cowplot)
+
+source('../functions/misc.R')
+source_all('../functions')
+
+# Read in PGS
+pgs <- read_pgs(config = '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe//usr/k1806347/configs/psych_demo/config.yaml', name = 'ukb')$ukb
+
+# Read in psam for application 82087 to get row number based IDs
+psam<-fread('/scratch/prj/ukbiobank/ukb82087/imputed/ukb82087_imp_chr1_MAF1_INFO4_v1.psam')
+psam$rn<-1:nrow(psam)
+
+# Update IDs to those in project 82087
+for(i in names(pgs)){
+  for(k in names(pgs[[i]])){
+    for(j in names(pgs[[i]][[k]])){
+      pgs_tmp<-pgs[[i]][[k]][[j]]
+      pgs_tmp<-merge(psam[, c('IID','rn'), with=F], pgs_tmp, by.x='rn', by.y='IID')
+      pgs_tmp$FID <- pgs_tmp$IID
+      pgs_tmp<-pgs_tmp[, names(pgs[[i]][[k]][[j]]), with=F]
+      pgs[[i]][[k]][[j]]<-pgs_tmp
+    }
+  }
+}
+
+saveRDS(pgs, '/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/ukb82087/psych_demo.pgs.megaprs.ukb82087.RDS')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
