@@ -1,0 +1,735 @@
+
+#########################################################################
+### ASSOCIATION TESTING 
+#########################################################################
+#########################################################################
+### Preamble
+#########################################################################
+### ssh into create
+### Request interactive session
+srun -p cpu --mem=80G --pty /bin/bash
+### Change directory
+cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
+### Launch R
+module add r 
+R
+#########################################################################
+### Written in R from here
+#########################################################################
+### Set library path
+.libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
+### Load necessary libraries
+library(broom)
+library(data.table) 
+library(tidyverse) 
+library(ggplot2) 
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(vroom)
+library(readr)
+library(gtsummary)
+library(e1071)
+library(forcats)
+library(UpSetR)
+library(cowplot)
+library(gt)
+library(gmodels)
+library(car)
+library(psych)
+library(fmsb)
+#########################################################################
+### Set up paths
+pgx_path <- "/datasets/ukbiobank/ukb82087/returns/FFR_33722_1/pgx_calls.imputed_callset_DAedit.csv"
+id_path <- "/datasets/ukbiobank/ukb82087/returns/ukb82087bridge33722.txt"
+### Read in files...
+ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.rds")
+
+# Verify dataset
+print(table(ukb_adresponse_dat_analysis_full$Citalopram)) 
+print(table(ukb_adresponse_dat_analysis_full$Fluoxetine)) 
+print(table(ukb_adresponse_dat_analysis_full$Paroxetine)) 
+print(table(ukb_adresponse_dat_analysis_full$Sertraline)) 
+print(table(ukb_adresponse_dat_analysis_full$sex)) 
+print(table(ukb_adresponse_dat_analysis_full$ethnic_background)) 
+
+#########################################################################
+### Set up association analysis parameters
+### Define the predictors
+predictors <- c("DEPR07_EUR", "ADHD05_EUR", "AUTI07_EUR", "BIPO02_EUR", "SCHI04_EUR", "ADnorem_EUR", "ADperc_EUR")
+### Define the covariates
+covariates <- c("age", "sex", "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "Batch")
+### Subset data for White ethnic background
+ subset_data <- ukb_adresponse_dat_analysis_full[ukb_adresponse_dat_analysis_full$ethnic_background == "White", ]
+### Sanity check  
+print(table(subset_data$Citalopram)) 
+print(table(subset_data$Fluoxetine)) 
+print(table(subset_data$Paroxetine)) 
+print(table(subset_data$Sertraline)) 
+
+  
+#########################################################################
+### Run association analysis - example Citalopram
+#########################################################################
+### Univariable
+#########################################################################
+### CITALOPRAM
+# Initialize dataframe to store all results
+all_univariate_prs_cit <- data.frame()
+
+for (predictor in predictors) {
+# Create formula string with scaled predictors and covariates
+  full_formula_str <- paste("Citalopram ~ scale(", predictor, ") + ", paste(covariates, collapse=" + "))
+  full_formula <- as.formula(full_formula_str)
+  
+  null_formula_str <- paste("Citalopram ~ ", paste(covariates, collapse=" + "))
+  null_formula <- as.formula(null_formula_str)
+ 
+# Fit logistic regression model on the subset data
+  model_cit_full <- glm(full_formula, family = binomial, data = subset_data)
+  model_cit_null <- glm(null_formula, family = binomial, data = subset_data)
+  
+# Calculate Nagelkerke R2 for both models
+  nagelkerke_full <- NagelkerkeR2(model_cit_full)
+  nagelkerke_null <- NagelkerkeR2(model_cit_null)
+  
+# Retrieve number of obcitvations used in the model for each category of Sertraline
+  Nyes <- sum(subset_data$Citalopram == "Yes", na.rm = TRUE)
+  Nno <- sum(subset_data$Citalopram == "No", na.rm = TRUE)
+  
+# Calculate the phenotypic variance explained by the predictor
+  nagelkerke_full <- NagelkerkeR2(model_cit_full)
+  nagelkerke_null <- NagelkerkeR2(model_cit_null)
+  
+# Extract R2 values
+  nagelkerke_fullR2 = nagelkerke_full$R2
+  nagelkerke_nullR2 = nagelkerke_null$R2
+  
+# Calculate phenotypic variance explained
+  R2_diff = nagelkerke_fullR2 - nagelkerke_nullR2
+  
+# Calculate Odds Ratios and Confidence Intervals, including significance
+   tidy_model_cit <- broom::tidy(model_cit_full) %>%
+    mutate(
+      Drug = "Citalopram",
+      Predictor = predictor, 
+      OR = exp(estimate),
+      lowerCI = exp(estimate - 1.96 * std.error),
+      upperCI = exp(estimate + 1.96 * std.error),
+      logOR = estimate,
+      logLowerCI = estimate - 1.96 * std.error,
+      logUpperCI = estimate + 1.96 * std.error,
+      Significance = ifelse(p.value < 0.05, "Significant", "Not Significant"), 
+      NagelkerkeFullR2 = nagelkerke_fullR2,
+      NagelkerkeNullR2 = nagelkerke_nullR2,
+      R2_diff = R2_diff,
+      Nyes = Nyes,
+      Nno = Nno
+    )
+  
+# Append the tidy model results to the results data frame
+  all_univariate_prs_cit <- rbind(all_univariate_prs_cit, tidy_model_cit)
+}
+
+### Correct for multiple testing 
+alpha <- 0.05
+### Apply the Bonferroni correction using the p.adjust function
+adjusted_p_values <- p.adjust(all_univariate_prs_cit$p.value, method = "bonferroni")
+### Determine if an association is significant based on the Bonferroni corrected p-values
+all_univariate_prs_cit$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
+
+### Correct for multiple testing across predictor categories - 55  
+stringent_alpha = alpha / 55
+### Determine if an association is significant based when accounting for all predictors
+all_univariate_prs_cit$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+#########################################################################
+### FLUOXETINE
+# Initialize dataframe to store all results
+all_univariate_prs_flu <- data.frame()
+
+for (predictor in predictors) {
+# Create formula string with scaled predictors and covariates
+  full_formula_str <- paste("Fluoxetine ~ scale(", predictor, ") + ", paste(covariates, collapse=" + "))
+  full_formula <- as.formula(full_formula_str)
+  
+  null_formula_str <- paste("Fluoxetine ~ ", paste(covariates, collapse=" + "))
+  null_formula <- as.formula(null_formula_str)
+  
+# Fit logistic regression model on the subset data
+  model_flu_full <- glm(full_formula, family = binomial, data = subset_data)
+  model_flu_null <- glm(null_formula, family = binomial, data = subset_data)
+  
+# Calculate Nagelkerke R2 for both models
+  nagelkerke_full <- NagelkerkeR2(model_flu_full)
+  nagelkerke_null <- NagelkerkeR2(model_flu_null)
+  
+# Retrieve number of obfluvations used in the model for each category of Sertraline
+  Nyes <- sum(subset_data$Fluoxetine == "Yes", na.rm = TRUE)
+  Nno <- sum(subset_data$Fluoxetine == "No", na.rm = TRUE)
+  
+# Calculate the phenotypic variance explained by the predictor
+  nagelkerke_full <- NagelkerkeR2(model_flu_full)
+  nagelkerke_null <- NagelkerkeR2(model_flu_null)
+  
+# Extract R2 values
+  nagelkerke_fullR2 = nagelkerke_full$R2
+  nagelkerke_nullR2 = nagelkerke_null$R2
+  
+# Calculate phenotypic variance explained
+  R2_diff = nagelkerke_fullR2 - nagelkerke_nullR2
+
+# Calculate Odds Ratios and Confidence Intervals, including significance
+   tidy_model_flu <- broom::tidy(model_flu_full) %>%
+    mutate(
+      Drug = "Fluoxetine",
+      Predictor = predictor,  # Add predictor name for reference
+      OR = exp(estimate),
+      lowerCI = exp(estimate - 1.96 * std.error),
+      upperCI = exp(estimate + 1.96 * std.error),
+      logOR = estimate,
+      logLowerCI = estimate - 1.96 * std.error,
+      logUpperCI = estimate + 1.96 * std.error,
+      Significance = ifelse(p.value < 0.05, "Significant", "Not Significant"), 
+      NagelkerkeFullR2 = nagelkerke_fullR2,
+      NagelkerkeNullR2 = nagelkerke_nullR2,
+      R2_diff = R2_diff,
+      Nyes = Nyes,
+      Nno = Nno
+    )
+  
+# Append the tidy model results to the results data frame
+  all_univariate_prs_flu <- rbind(all_univariate_prs_flu, tidy_model_flu)
+}
+
+### Correct for multiple testing 
+alpha <- 0.05
+### Apply the Bonferroni correction using the p.adjust function
+adjusted_p_values <- p.adjust(all_univariate_prs_flu$p.value, method = "bonferroni")
+### Determine if an association is significant based on the Bonferroni corrected p-values
+all_univariate_prs_flu$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
+
+### Correct for multiple testing across predictor categories - 55  
+stringent_alpha = alpha / 55
+### Determine if an association is significant based when accounting for all predictors
+all_univariate_prs_flu$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+#########################################################################
+### PAROXETINE
+# Initialize dataframe to store all results
+all_univariate_prs_par <- data.frame()
+
+for (predictor in predictors) {
+# Create formula string with scaled predictors and covariates
+  full_formula_str <- paste("Paroxetine ~ scale(", predictor, ") + ", paste(covariates, collapse=" + "))
+  full_formula <- as.formula(full_formula_str)
+  
+  null_formula_str <- paste("Paroxetine ~ ", paste(covariates, collapse=" + "))
+  null_formula <- as.formula(null_formula_str)
+  
+# Fit logistic regression model on the subset data
+  model_par_full <- glm(full_formula, family = binomial, data = subset_data)
+  
+  model_par_null <- glm(null_formula, family = binomial, data = subset_data)
+  
+# Calculate Nagelkerke R2 for both models
+  nagelkerke_full <- NagelkerkeR2(model_par_full)
+  nagelkerke_null <- NagelkerkeR2(model_par_null)
+    
+# Retrieve number of obparvations used in the model for each category of Sertraline
+  Nyes <- sum(subset_data$Paroxetine == "Yes", na.rm = TRUE)
+  Nno <- sum(subset_data$Paroxetine == "No", na.rm = TRUE)
+  
+# Calculate the phenotypic variance explained by the predictor
+  nagelkerke_full <- NagelkerkeR2(model_par_full)
+  nagelkerke_null <- NagelkerkeR2(model_par_null)
+  
+# Extract R2 values
+  nagelkerke_fullR2 = nagelkerke_full$R2
+  nagelkerke_nullR2 = nagelkerke_null$R2
+  
+# Calculate phenotypic variance explained
+  R2_diff = nagelkerke_fullR2 - nagelkerke_nullR2
+  
+# Calculate Odds Ratios and Confidence Intervals, including significance
+   tidy_model_par <- broom::tidy(model_par_full) %>%
+    mutate(
+      Drug = "Paroxetine",
+      Predictor = predictor,  # Add predictor name for reference
+      OR = exp(estimate),
+      lowerCI = exp(estimate - 1.96 * std.error),
+      upperCI = exp(estimate + 1.96 * std.error),
+      logOR = estimate,
+      logLowerCI = estimate - 1.96 * std.error,
+      logUpperCI = estimate + 1.96 * std.error,
+      Significance = ifelse(p.value < 0.05, "Significant", "Not Significant"), 
+      NagelkerkeFullR2 = nagelkerke_fullR2,
+      NagelkerkeNullR2 = nagelkerke_nullR2,
+      R2_diff = R2_diff,
+      Nyes = Nyes,
+      Nno = Nno
+    )
+  
+# Append the tidy model results to the results data frame
+  all_univariate_prs_par <- rbind(all_univariate_prs_par, tidy_model_par)
+}
+
+### Correct for multiple testing 
+alpha <- 0.05
+### Apply the Bonferroni correction using the p.adjust function
+adjusted_p_values <- p.adjust(all_univariate_prs_par$p.value, method = "bonferroni")
+### Determine if an association is significant based on the Bonferroni corrected p-values
+all_univariate_prs_par$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
+
+### Correct for multiple testing across predictor categories - 55  
+stringent_alpha = alpha / 55
+### Determine if an association is significant based when accounting for all predictors
+all_univariate_prs_par$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+#########################################################################
+### SERTRALINE 
+# Initialize dataframe to store all results
+all_univariate_prs_ser <- data.frame()
+
+for (predictor in predictors) {
+# Create formula string with scaled predictors and covariates
+  full_formula_str <- paste("Sertraline ~ scale(", predictor, ") + ", paste(covariates, collapse=" + "))
+  full_formula <- as.formula(full_formula_str)
+  
+  null_formula_str <- paste("Sertraline ~ ", paste(covariates, collapse=" + "))
+  null_formula <- as.formula(null_formula_str)
+  
+# Fit logistic regression model on the subset data
+  model_ser_full <- glm(full_formula, family = binomial, data = subset_data)
+  model_ser_null <- glm(null_formula, family = binomial, data = subset_data)
+  
+   # Calculate Nagelkerke R2 for both models
+  nagelkerke_full <- NagelkerkeR2(model_ser_full)
+  nagelkerke_null <- NagelkerkeR2(model_ser_null)
+    
+ # Retrieve number of observations used in the model for each category of Sertraline
+  Nyes <- sum(subset_data$Sertraline == "Yes", na.rm = TRUE)
+  Nno <- sum(subset_data$Sertraline == "No", na.rm = TRUE)
+    
+  # Calculate the phenotypic variance explained by the predictor
+  nagelkerke_full <- NagelkerkeR2(model_ser_full)
+  nagelkerke_null <- NagelkerkeR2(model_ser_null)
+  
+ # Extract R2 values
+  nagelkerke_fullR2 = nagelkerke_full$R2
+  nagelkerke_nullR2 = nagelkerke_null$R2
+  
+  # Calculate phenotypic variance explained
+  R2_diff = nagelkerke_fullR2 - nagelkerke_nullR2
+  
+# Calculate Odds Ratios and Confidence Intervals, including significance
+   tidy_model_ser <- broom::tidy(model_ser_full) %>%
+    mutate(
+      Drug = "Sertraline",
+      Predictor = predictor,  # Add predictor name for reference
+      OR = exp(estimate),
+      lowerCI = exp(estimate - 1.96 * std.error),
+      upperCI = exp(estimate + 1.96 * std.error),
+      logOR = estimate,
+      logLowerCI = estimate - 1.96 * std.error,
+      logUpperCI = estimate + 1.96 * std.error,
+      Significance = ifelse(p.value < 0.05, "Significant", "Not Significant"), 
+      NagelkerkeFullR2 = nagelkerke_fullR2,
+      NagelkerkeNullR2 = nagelkerke_nullR2,
+      R2_diff = R2_diff,
+      Nyes = Nyes,
+      Nno = Nno
+    )
+  
+# Append the tidy model results to the results data frame
+  all_univariate_prs_ser <- rbind(all_univariate_prs_ser, tidy_model_ser)
+}
+
+### Correct for multiple testing 
+alpha <- 0.05
+### Apply the Bonferroni correction using the p.adjust function
+adjusted_p_values <- p.adjust(all_univariate_prs_ser$p.value, method = "bonferroni")
+### Determine if an association is significant based on the Bonferroni corrected p-values
+all_univariate_prs_ser$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
+
+### Correct for multiple testing across predictor categories - 55  
+stringent_alpha = alpha / 55
+### Determine if an association is significant based when accounting for all predictors
+all_univariate_prs_ser$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+#########################################################################
+### SSRI all
+### Factorise SSRI_status_all 
+subset_data$SSRI_status_all <- factor(subset_data$SSRI_status_all, levels = c("Yes", "No"))
+# Verify the levels 
+levels(subset_data$SSRI_status_all)
+
+### Initialize dataframe to store all results
+all_univariate_prs_ssri <- data.frame()
+
+for (predictor in predictors) {
+# Create formula string with scaled predictors and covariates
+  full_formula_str <- paste("SSRI_status_all ~ scale(", predictor, ") + ", paste(covariates, collapse=" + "))
+  full_formula <- as.formula(full_formula_str)
+  
+  null_formula_str <- paste("SSRI_status_all ~ ", paste(covariates, collapse=" + "))
+  null_formula <- as.formula(null_formula_str)
+  
+# Fit logistic regression model on the subset data
+  model_ssri_full <- glm(full_formula, family = binomial, data = subset_data)
+    model_ssri_null <- glm(null_formula, family = binomial, data = subset_data)
+  
+# Calculate Nagelkerke R2 for both models
+  nagelkerke_full <- NagelkerkeR2(model_ssri_full)
+  nagelkerke_null <- NagelkerkeR2(model_ssri_null)
+  
+# Retrieve number of obcitvations used in the model for each category of Sertraline
+  Nyes <- sum(subset_data$SSRI_status_all == "Yes", na.rm = TRUE)
+  Nno <- sum(subset_data$SSRI_status_all == "No", na.rm = TRUE)
+  
+# Calculate the phenotypic variance explained by the predictor
+  nagelkerke_full <- NagelkerkeR2(model_ssri_full)
+  nagelkerke_null <- NagelkerkeR2(model_ssri_null)
+  
+# Extract R2 values
+  nagelkerke_fullR2 = nagelkerke_full$R2
+  nagelkerke_nullR2 = nagelkerke_null$R2
+  
+# Calculate phenotypic variance explained
+  R2_diff = nagelkerke_fullR2 - nagelkerke_nullR2
+  
+# Calculate Odds Ratios and Confidence Intervals, including significance
+   tidy_model_ssri <- broom::tidy(model_ssri_full) %>%
+    mutate(
+      Drug = "SSRI",
+      Predictor = predictor,  # Add predictor name for reference
+      OR = exp(estimate),
+      lowerCI = exp(estimate - 1.96 * std.error),
+      upperCI = exp(estimate + 1.96 * std.error),
+      logOR = estimate,
+      logLowerCI = estimate - 1.96 * std.error,
+      logUpperCI = estimate + 1.96 * std.error,
+      Significance = ifelse(p.value < 0.05, "Significant", "Not Significant"), 
+      NagelkerkeFullR2 = nagelkerke_fullR2,
+      NagelkerkeNullR2 = nagelkerke_nullR2,
+      R2_diff = R2_diff,
+      Nyes = Nyes,
+      Nno = Nno
+    )
+  
+# Append the tidy model results to the results data frame
+  all_univariate_prs_ssri <- rbind(all_univariate_prs_ssri, tidy_model_ssri)
+}
+
+### Correct for multiple testing 
+alpha <- 0.05
+### Apply the Bonferroni correction using the p.adjust function
+adjusted_p_values <- p.adjust(all_univariate_prs_ssri$p.value, method = "bonferroni")
+### Determine if an association is significant based on the Bonferroni corrected p-values
+all_univariate_prs_ssri$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
+
+### Correct for multiple testing across predictor categories - 55  
+stringent_alpha = alpha / 55
+### Determine if an association is significant based when accounting for all predictors
+all_univariate_prs_ssri$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+#########################################################################
+### SSRI all conservative
+### Factorise SSRI-status_all_cons
+subset_data$SSRI_status_all_cons <- factor(subset_data$SSRI_status_all_cons, levels = c("Yes", "No"))
+# Verify the levels 
+levels(subset_data$SSRI_status_all_cons)
+
+### Initialize dataframe to store all results
+all_univariate_prs_ssri_cons <- data.frame()
+
+for (predictor in predictors) {
+# Create formula string with scaled predictors and covariates
+  full_formula_str <- paste("SSRI_status_all_cons ~ scale(", predictor, ") + ", paste(covariates, collapse=" + "))
+  full_formula <- as.formula(full_formula_str)
+  
+  null_formula_str <- paste("SSRI_status_all_cons ~ ", paste(covariates, collapse=" + "))
+  null_formula <- as.formula(null_formula_str)
+  
+# Fit logistic regression model on the subset data
+  model_ssri_cons_full <- glm(full_formula, family = binomial, data = subset_data)
+  model_ssri_cons_null <- glm(null_formula, family = binomial, data = subset_data)
+  
+# Calculate Nagelkerke R2 for both models
+  nagelkerke_full <- NagelkerkeR2(model_ssri_cons_full)
+  nagelkerke_null <- NagelkerkeR2(model_ssri_cons_null)
+  
+# Retrieve number of obcitvations used in the model for each category of Sertraline
+  Nyes <- sum(subset_data$SSRI_status_all_cons == "Yes", na.rm = TRUE)
+  Nno <- sum(subset_data$SSRI_status_all_cons == "No", na.rm = TRUE)
+  
+# Calculate the phenotypic variance explained by the predictor
+  nagelkerke_full <- NagelkerkeR2(model_ssri_cons_full)
+  nagelkerke_null <- NagelkerkeR2(model_ssri_cons_null)
+  
+# Extract R2 values
+  nagelkerke_fullR2 = nagelkerke_full$R2
+  nagelkerke_nullR2 = nagelkerke_null$R2
+  
+# Calculate phenotypic variance explained
+  R2_diff = nagelkerke_fullR2 - nagelkerke_nullR2
+
+# Calculate Odds Ratios and Confidence Intervals, including significance
+   tidy_model_ssri_cons <- broom::tidy(model_ssri_cons_full) %>%
+    mutate(
+      Drug = "SSRI cons",
+      Predictor = predictor,  # Add predictor name for reference
+      OR = exp(estimate),
+      lowerCI = exp(estimate - 1.96 * std.error),
+      upperCI = exp(estimate + 1.96 * std.error),
+      logOR = estimate,
+      logLowerCI = estimate - 1.96 * std.error,
+      logUpperCI = estimate + 1.96 * std.error,
+      Significance = ifelse(p.value < 0.05, "Significant", "Not Significant"), 
+      NagelkerkeFullR2 = nagelkerke_fullR2,
+      NagelkerkeNullR2 = nagelkerke_nullR2,
+      R2_diff = R2_diff,
+      Nyes = Nyes,
+      Nno = Nno
+    )
+  
+# Append the tidy model results to the results data frame
+  all_univariate_prs_ssri_cons <- rbind(all_univariate_prs_ssri_cons, tidy_model_ssri_cons)
+}
+
+### Correct for multiple testing 
+alpha <- 0.05
+### Apply the Bonferroni correction using the p.adjust function
+adjusted_p_values <- p.adjust(all_univariate_prs_ssri_cons$p.value, method = "bonferroni")
+### Determine if an association is significant based on the Bonferroni corrected p-values
+all_univariate_prs_ssri_cons$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
+
+### Correct for multiple testing across predictor categories - 55  
+stringent_alpha = alpha / 55
+### Determine if an association is significant based when accounting for all predictors
+all_univariate_prs_ssri_cons$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+
+#########################################################################
+### Combine and save
+
+# Combine the data frames using rbind()
+all_univariate_prs_white <- rbind(all_univariate_prs_cit, all_univariate_prs_flu, all_univariate_prs_par, all_univariate_prs_ser, 
+                                  all_univariate_prs_ssri, all_univariate_prs_ssri_cons)
+# Save the dataframe to a CSV file
+write.csv(all_univariate_prs_white, "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/all_univariate_PRS_Results.csv", row.names = FALSE)
+
+#########################################################################
+### Prepare for Plotting
+# Filtering out the intercept, age, sex, and principal components (PCs)
+all_univariate_prs_white <- all_univariate_prs_white %>%
+  filter(!str_detect(term, "Intercept") & 
+         !str_detect(term, "age") & 
+         !str_detect(term, "sex") & 
+         !str_detect(term, "PC1") & 
+         !str_detect(term, "PC2") & 
+         !str_detect(term, "PC3") & 
+         !str_detect(term, "PC4") & 
+         !str_detect(term, "PC5") & 
+         !str_detect(term, "PC6")& 
+         !str_detect(term, "Batch")
+         )
+
+# Filtering out the SSRI_all_cons
+all_univariate_prs_white <- all_univariate_prs_white %>%
+  filter(!str_detect(Drug, "SSRI cons"))
+
+# Adjust term names for readability and add reference group info
+all_univariate_prs_white <- all_univariate_prs_white %>%
+  mutate(term = case_when(
+    term == "scale(DEPR07_EUR)" ~ "DEPR",
+    term == "scale(ADHD05_EUR)" ~ "ADHD",
+    term == "scale(AUTI07_EUR)" ~ "AUTI",
+    term == "scale(BIPO02_EUR)" ~ "BIPO",
+    term == "scale(SCHI04_EUR)" ~ "SCHI",
+    term == "scale(ADnorem_EUR)" ~ "ADnorem",
+    term == "scale(ADperc_EUR)" ~ "ADperc",
+    TRUE ~ term  # Keeps other terms unchanged
+  ))
+
+# Adjust predictor names for readability
+all_univariate_prs_white <- all_univariate_prs_white %>%
+  mutate(Predictor = case_when(
+    Predictor == "DEPR07_EUR" ~ "DEPR",
+    Predictor == "ADHD05_EUR" ~ "ADHD",
+    Predictor == "AUTI07_EUR" ~ "AUTI",
+    Predictor == "BIPO02_EUR" ~ "BIPO",
+    Predictor == "SCHI04_EUR" ~ "SCHI",
+    Predictor == "ADnorem_EUR" ~ "ADnorem",
+    Predictor == "ADperc_EUR" ~ "ADperc",
+    TRUE ~ Predictor  # Keeps other predictors unchanged
+  ))
+
+# Define the desired order of drugs
+desired_order_drugs <- c("SSRI", "Citalopram", "Fluoxetine",  "Paroxetine", "Sertraline")
+
+# Manually set the levels of the 'Drug' factor
+all_univariate_prs_white$Drug <- factor(all_univariate_prs_white$Drug, levels = desired_order_drugs)
+
+# Define the desired order of terms (ensure no duplicates and correct naming)
+desired_order_terms <- c("ADperc","ADnorem","SCHI", "BIPO", "AUTI", "ADHD","DEPR")
+
+# Manually set the levels of the 'term' factor
+all_univariate_prs_white$term <- factor(all_univariate_prs_white$term, levels = desired_order_terms)
+
+# Define the desired order of predictors
+desired_order_predictors <- c("ADperc","ADnorem","SCHI", "BIPO", "AUTI", "ADHD","DEPR")
+
+# Manually set the levels of the 'Predictor' factor
+all_univariate_prs_white$Predictor <- factor(all_univariate_prs_white$Predictor, levels = desired_order_predictors)
+
+# Reorder the data frame based on the specified order of terms and predictors
+all_univariate_prs_white <- all_univariate_prs_white %>%
+  arrange(factor(Predictor, levels = desired_order_predictors), factor(term, levels = desired_order_terms))
+
+# Create a new color variable 
+all_univariate_prs_white <- all_univariate_prs_white %>%
+  mutate(final_significance = case_when(
+    Significance == "Not Significant" & corrected_significance == "Not Significant" ~ "Not significant",
+    Significance == "Significant" & corrected_significance == "Not Significant" ~ "Not significant",
+    Significance == "Significant" & corrected_significance == "Significant" ~ "Significant",
+    TRUE ~ NA_character_  # Handles any other cases that don't fit the above patterns
+  ))
+
+# Correct the formatting for p-values
+all_univariate_prs_white$p.value2 <- format(all_univariate_prs_white$p.value, scientific = TRUE, digits = 3)
+all_univariate_prs_white$p.value2 <- gsub("^(.*)e", "'\\1'e", all_univariate_prs_white$p.value2)
+all_univariate_prs_white$p.value2 <- gsub("e", "%*%10^", all_univariate_prs_white$p.value2)
+
+# Add "p = " in front of the p-values and make them italic, add an asterisk for "Significant" values in final_significance_max
+all_univariate_prs_white$P_label <- ifelse(
+  all_univariate_prs_white$corrected_significance_max == "Significant",
+  paste0("italic('p = ')", " * ", all_univariate_prs_white$p.value2, " * ' *'"),  # Add an asterisk
+  paste0("italic('p = ')", " * ", all_univariate_prs_white$p.value2)  # Without asterisk
+)
+
+#########################################################################
+### Plotting
+
+# Ensure data integrity and filter OR values within the specified range
+all_univariate_prs_white <- all_univariate_prs_white %>%
+  filter(!is.na(term) & !is.na(OR) & !is.na(lowerCI) & !is.na(upperCI) & !is.na(Drug) & !is.na(Significance)) %>%
+  filter(OR >= 0.5 & OR <= 1.5, lowerCI >= 0.5 & upperCI <= 1.5)  # Filter OR and CI within range
+    
+# Create a new color variable 
+all_univariate_prs_white <- all_univariate_prs_white %>%
+  mutate(final_significance = case_when(
+    Significance == "Not Significant" & corrected_significance == "Not Significant" ~ "Not significant",
+    Significance == "Significant" & corrected_significance == "Not Significant" ~ "Not significant",
+    Significance == "Significant" & corrected_significance == "Significant" ~ "Significant",
+    TRUE ~ NA_character_  # Handles any other cases that don't fit the above patterns
+  ))
+
+# Ensure 'final_significance' is a factor with correct levels
+all_univariate_prs_white$final_significance <- factor(all_univariate_prs_white$final_significance, levels = c("Significant", "Not significant"))
+
+# Define the plot with corrected scale and color settings
+png('/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/plots/multiple/prs_univariate_analysis_revised_wcpg.png', 
+    unit='px', res=300, width=3200, height=2500)
+
+prs_plot <- ggplot(all_univariate_prs_white, aes(x = term, y = OR, color = Drug, group = Drug, shape = final_significance)) +
+  geom_point(position = position_dodge(width = 0.6), size = 3) +  # Adjusted position for clarity
+  geom_errorbar(aes(ymin = lowerCI, ymax = upperCI), width = 0.2, position = position_dodge(width = 0.6)) +  # Error bars with dodging
+  geom_hline(yintercept = 1, color = "black", linewidth = 0.8) +  # Reference line at OR = 1
+  scale_color_manual(values = c(
+    "SSRI\n (Y = 15192, N = 3889)" = "#6a3d9a",
+    "Citalopram\n (Y = 6776, N = 1397)" = "#1f78b4", 
+    "Fluoxetine\n (Y = 6490, N = 1806)" = "#33a02c", 
+    "Paroxetine\n (Y = 1720, N = 525)" = "#e31a1c", 
+    "Sertraline\n (Y = 4573, N = 1160)" = "#ff7f00"
+  )) +
+ scale_shape_manual(values = c("Significant" = 19, "Not significant" = 1)) +  # Filled circle for significant, empty circle for non-significant
+   labs(
+    x = "Polygenic scores",
+    y = "Odds Ratio (OR) [95% CI]",
+    color = "Drug",
+    shape = "Significance"
+  ) +
+  scale_y_continuous(  # Use a linear scale for y-axis
+    limits = c(0.75, 1.5),  # Adjust limits as needed for your data range
+    breaks = seq(0.75, 1.5, by = 0.25),  # Set breaks to 0.5 intervals
+    labels = scales::number_format(accuracy = 0.1)
+  ) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 17, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 13),
+    axis.text.y = element_text(size = 13),
+    axis.title.x = element_text(size = 15),
+    axis.title.y = element_text(size = 15, margin = margin(t = 0, r = 20, b = 0, l = 20)),
+    legend.position = "right",
+    legend.text = element_text(size = 13),
+    legend.key.width = unit(1, "cm"),  # Increase space within legend items horizontally
+    legend.key.height = unit(1, "cm")  # Increase space within legend items vertically
+  )
+  
+# Add p-values as text for "ADnorem" term with specific positioning
+prs_plot <- prs_plot +
+  geom_text(
+    data = subset(all_univariate_prs_white, final_significance == "Significant" & term == "ADnorem"),  # Filter for "ADnorem" term
+    aes(label = P_label),  # Use formatted p-values
+    color = "black",  # Set text color to black
+    position = position_dodge(width = 0.4),
+    vjust = 0.4,  # Adjust vertical position for "ADnorem"
+    hjust = -1.1,  # Adjust horizontal position for "ADnorem"
+    size = 3.5,
+    angle = 90, # Adjust text size
+    parse = TRUE  # Parse the text to correctly interpret math expressions
+  )
+
+# Add p-values as text for "SCHI" term with specific positioning
+prs_plot <- prs_plot +
+  geom_text(
+    data = subset(all_univariate_prs_white, final_significance == "Significant" & term == "SCHI"),  # Filter for "SCHI" term
+    aes(label = P_label),  # Use formatted p-values
+    color = "black",  # Set text color to black
+    position = position_dodge(width = 0.4),
+    vjust = -0.9,  # Adjust vertical position for "SCHI"
+    hjust = -0.4,  # Adjust horizontal position for "SCHI"
+    size = 3.5,
+    angle = 90, # Adjust text size
+    parse = TRUE  # Parse the text to correctly interpret math expressions
+  )
+
+prs_plot <- prs_plot +
+  geom_text(
+    data = subset(all_univariate_prs_white, final_significance == "Significant" & term == "ADHD" & Drug == "SSRI\n (Y = 15192, N = 3889)"),  # Filter for "AUTI" term and SSRI
+    aes(label = P_label),  # Use formatted p-values
+    color = "black",  # Set text color to black
+    position = position_dodge(width = 0.4),
+    vjust = -1.1,  # Adjust vertical position for better alignment
+    hjust = -0.4,  # Adjust horizontal position
+    size = 3.5,  # Adjust text size
+    angle = 90,  # Rotate text vertically
+    parse = TRUE  # Parse the text to correctly interpret math expressions
+  )
+
+prs_plot <- prs_plot +
+  geom_text(
+    data = subset(all_univariate_prs_white, final_significance == "Significant" & term == "ADHD" & Drug == "Fluoxetine\n (Y = 6490, N = 1806)"),  # Filter for "AUTI" term and SSRI
+    aes(label = P_label),  # Use formatted p-values
+    color = "black",  # Set text color to black
+    position = position_dodge(width = 0.4),
+    vjust = 0.2,  # Adjust vertical position for better alignment
+    hjust = -0.6,  # Adjust horizontal position
+    size = 3.5,  # Adjust text size
+    angle = 90,  # Rotate text vertically
+    parse = TRUE  # Parse the text to correctly interpret math expressions
+  )
+  
+  prs_plot <- prs_plot +
+  geom_text(
+    data = subset(all_univariate_prs_white, final_significance == "Significant" & term == "DEPR" & Drug == "SSRI\n (Y = 15192, N = 3889)"),  # Filter for "AUTI" term and SSRI
+    aes(label = P_label),  # Use formatted p-values
+    color = "black",  # Set text color to black
+    position = position_dodge(width = 0.4),
+    vjust = -0.9,  # Adjust vertical position for better alignment
+    hjust = -0.4,  # Adjust horizontal position
+    size = 3.5,  # Adjust text size
+    angle = 90,  # Rotate text vertically
+    parse = TRUE  # Parse the text to correctly interpret math expressions
+  )
+  
+# Print the plot
+print(prs_plot)
+
+dev.off()
