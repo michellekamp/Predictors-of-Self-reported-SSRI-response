@@ -56,7 +56,6 @@ ukb_adresponse_dat <- readRDS(ukb_adresponse_path)
 cyp2c19_dat <- readRDS(cyp2c19_path)
 prs_dat <-readRDS(prs_path)
 
-
 ### Sanity checks 
 ncol(ukb_adresponse_dat) 
 ncol(cyp2c19_dat) 
@@ -65,11 +64,6 @@ nrow(cyp2c19_dat)
 str(ukb_adresponse_dat) 
 str(cyp2c19_dat)
 str(prs_dat) 
-
-There were `r ncol(ukb_adresponse_dat)` columns in the ukb dataset
-There were `r ncol(cyp2c19_dat)` columns in the combined dataset
-There were `r nrow(ukb_adresponse_dat)` participants in the ukb daset
-There were `r nrow(cyp2c19_dat)` participants in the combined dataset
 
 ## Rename variables 
 ukb_adresponse_dat <- ukb_adresponse_dat %>%
@@ -353,7 +347,6 @@ ukb_adresponse_dat_filtered$fraction_dayaffected_worst <- factor(ukb_adresponse_
                                                             "Less than half of the day", "Do not know", "Prefer not to answer", 
                                                             NA))
 
-
 ukb_adresponse_dat_filtered$freq_dep_days_worst <- factor(ukb_adresponse_dat_filtered$freq_dep_days_worst, 
                                               levels = c("Every day", "Almost every day", "Less often", "Do not know", 
                                               "Prefer not to answer", NA))
@@ -545,7 +538,7 @@ saveRDS(ukb_adresponse_dat_analysis, file = "/scratch/prj/ukbiobank/usr/michelle
 
 
 #########################################################################
-### Data collating  - Add PGS and PCs 
+### Data collating  - Add PGS, CYP2C19 and PCs 
 
 ### -------- Add PGS ------------##
 
@@ -637,6 +630,12 @@ ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_mid, by = 
 # Print a summary to check the results
 print(paste("Columns in the dataframe:", length(colnames(ukb_adresponse_dat_analysis)))) 
 print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis)))
+
+### -------- Add CYP2C19 ------------##
+
+
+
+
 
 
 ### -------- Add PCs ------------##
