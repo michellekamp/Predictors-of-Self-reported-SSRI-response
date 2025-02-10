@@ -21,7 +21,9 @@ R
 ### Written in R from here
 #########################################################################
 
+### Set library path
 .libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
+### Load necessary libraries
 library(broom)
 library(data.table) 
 library(tidyverse) 
@@ -43,15 +45,9 @@ library(psych)
 ```
 
 ## Show start time
-```{r starttime, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
 cat('The starting time for running this script is', format(Sys.time(), format = "%Y-%m-%d %H:%M:%S"), '\n')
-```
 
 ## Define and read in file paths
-```{r file_paths, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
 ukb_adresponse_path <- "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/combined_ukbb_mhq2_df.rds"
 cyp2c19_path <- "/datasets/ukbiobank/ukb82087/returns/cyp2c19_met_status.rds"
 prs_path <- "/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/ukb82087/psych_demo.pgs.megaprs_pseudo.ukb82087.RDS"
@@ -59,34 +55,23 @@ prs_path <- "/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/ukb
 ukb_adresponse_dat <- readRDS(ukb_adresponse_path)
 cyp2c19_dat <- readRDS(cyp2c19_path)
 prs_dat <-readRDS(prs_path)
-```
+
 
 ### Sanity checks 
-```{r df_checks, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
-ncol(ukb_adresponse_dat) #130
-ncol(cyp2c19_dat) #4
-nrow(ukb_adresponse_dat) #502353
-nrow(cyp2c19_dat) #486032
+ncol(ukb_adresponse_dat) 
+ncol(cyp2c19_dat) 
+nrow(ukb_adresponse_dat) 
+nrow(cyp2c19_dat) 
 str(ukb_adresponse_dat) 
 str(cyp2c19_dat)
 str(prs_dat) 
-```
 
 There were `r ncol(ukb_adresponse_dat)` columns in the ukb dataset
 There were `r ncol(cyp2c19_dat)` columns in the combined dataset
 There were `r nrow(ukb_adresponse_dat)` participants in the ukb daset
 There were `r nrow(cyp2c19_dat)` participants in the combined dataset
 
-# Descriptive analysis of UKB MHQ2 AD response datset only 
-
 ## Rename variables 
-```{r rename, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
-library(data.table)
-
 ukb_adresponse_dat <- ukb_adresponse_dat %>%
   rename(
     eid = "eid",  
@@ -224,38 +209,17 @@ ukb_adresponse_dat <- ukb_adresponse_dat %>%
     weight_change_worst = "weight_change_worst-0.0",
     year_of_birth = "year_of_birth-0.0")
 
-```
-
-### Sanity checks 
-
-```{r check_2, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
-ncol(ukb_adresponse_dat) #130
-nrow(ukb_adresponse_dat) #502353
-```
-
 ## Restrict dataset to those who answered yes to sadness and loss of interest
 ### Ever had prolonged feelings of sadness (field_id 29011) == Yes
 ### Ever had prolonged loss of interest (field_id 29012) == Yes
 
-```{r mhq2_particpants, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-
 ukb_adresponse_dat_filtered <- ukb_adresponse_dat %>%
   filter(sadness_dep == "Yes" | loss_interest == "Yes")
 
-# Print the count of individuals remaining 
 number_of_unique_ids <- n_distinct(ukb_adresponse_dat_filtered$eid)
 print(number_of_unique_ids)  #79888 (as per ukb search)
-```
-
-There are `r number_of_unique_ids` individuals when filtering based on who answered yes to the two screening questions.
 
 ## Restrict dataset to only unipolar depression with no psychosis, schizophrenia, etc.  
-
-```{r depression_only, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
 
 # Store initial number of rows
 initial_count <- nrow(ukb_adresponse_dat_filtered)
@@ -268,24 +232,13 @@ ukb_adresponse_dat_filtered2 <- ukb_adresponse_dat_filtered %>%
 
 # Count the number of unique IDs after the filter
 number_of_remaining_ids <- n_distinct(ukb_adresponse_dat_filtered2$eid)
-print(number_of_remaining_ids) #78653
+print(number_of_remaining_ids) 
 
 # Calculate the number of excluded individuals
 excluded_nondep_count <- initial_count - nrow(ukb_adresponse_dat_filtered2)
-print(excluded_nondep_count)  # e.g., 1235
-```
+print(excluded_nondep_count)  
 
-There are `r number_of_remaining_ids` individuals when removing those with other mental health diagnoses from diagnosis variable.
-'r excluded_nondep_count` are excluded from the dataset based on other mental health diagnoses from diagnosis variable.
-
-## Additional check 
-
-```{r depression_only2, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-
-table(ukb_adresponse_dat_filtered$depression_status)
-
-# # Filter those who have specific diagnoses in any depression_status column 
+## Additional filter of those who have specific diagnoses in any depression_status column 
 ukb_adresponse_dat_filtered <- ukb_adresponse_dat_filtered2 %>%
   # Exclude individuals with any specified diagnoses in diagnosis columns
   filter(!if_any(starts_with("depression_status"), ~ . %in% c("Bipolar I Disorder",
@@ -293,24 +246,12 @@ ukb_adresponse_dat_filtered <- ukb_adresponse_dat_filtered2 %>%
 
 # Calculate the total number of excluded individuals
 excluded_nondep_count2 <- initial_count - nrow(ukb_adresponse_dat_filtered)
-print(excluded_nondep_count2)  # e.g., 1527
+print(excluded_nondep_count2)  #
 
-
-print(paste("Columns in the dataframe:", ncol(ukb_adresponse_dat_filtered))) #121
-print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_filtered))) #78361
-print(paste("Total number of particpants removed:", print(excluded_nondep_count2))) #1527
-
-```
-
-There are `r nrow(ukb_adresponse_dat_filtered)` individuals when removing those with other mental health diagnoses from depression_status variable.
-
-## **Data wrangling - clean, create and order variables**
+#########################################################################
+### Data wrangling - clean, create and order variables
 
 ### Develop family history variable
-
-```{r family_history, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-
 # Ensure df is treated as a dataframe
 ukb_adresponse_dat_filtered <- as.data.frame(ukb_adresponse_dat_filtered)
 
@@ -330,14 +271,7 @@ ukb_adresponse_dat_filtered$family_history <- ifelse(ukb_adresponse_dat_filtered
                                                ukb_adresponse_dat_filtered$Sibs_dep == "Yes", 
                                              "Yes", "No")
 
-table(ukb_adresponse_dat_filtered$family_history)
-
-```
-
 ### Develop highest education - Educational attainment variable
-
-```{r educational_attainment, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
 
 # Replace -3 with "Prefer not to answer" across all relevant columns
 ukb_adresponse_dat_filtered[paste0("educational_attain", 0:5)][ukb_adresponse_dat_filtered[paste0("educational_attain", 0:5)] == -3] <- "Prefer not to answer"
@@ -363,16 +297,7 @@ ukb_adresponse_dat_filtered$highest_education <- sapply(
   }
 )
 
-#Checks
-unique(ukb_adresponse_dat_filtered$highest_education)
-table(ukb_adresponse_dat_filtered$highest_education)
-
-```
-
 ### Order factor levels of multiple variables
-
-```{r variable_factorisation, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
 
 ukb_adresponse_dat_filtered$ethnic_background <- factor(ukb_adresponse_dat_filtered$ethnic_background, 
                                                 levels = c("Asian", "Black", "Mixed", "White", "Not available"))
@@ -391,9 +316,6 @@ ukb_adresponse_dat_filtered$alcohol_status <- factor(ukb_adresponse_dat_filtered
 
 ukb_adresponse_dat_filtered$smoking_status <- factor(ukb_adresponse_dat_filtered$smoking_status, 
                                              levels = c("Current", "Previous", "Never", "Not available"))
-
-### clinical
-
 
 ukb_adresponse_dat_filtered$brightening_mood_worst <- factor(ukb_adresponse_dat_filtered$brightening_mood_worst, 
                                              levels = c("Yes", "No", "Do not know", "Prefer to answer", "Not available"))
@@ -500,31 +422,17 @@ ukb_adresponse_dat_filtered$informed_prof_dep <- factor(ukb_adresponse_dat_filte
 
 ukb_adresponse_dat_filtered$highest_education <- factor(ukb_adresponse_dat_filtered$highest_education, 
                                                             levels = c("University degree", "Vocational", "Further", "Secondary", "None of the above", "Prefer not to answer"))
-
-
-```
-
-
 ## Print summaries and save files 
 
-```{r, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-
-print(paste("Columns in the dataframe:", ncol(ukb_adresponse_dat_filtered))) #136
-print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_filtered))) #78361
+print(paste("Columns in the dataframe:", ncol(ukb_adresponse_dat_filtered))) 
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_filtered))) 
 
 # Save the ukb_adresponse_dat_filtered to an RDS file
 saveRDS(ukb_adresponse_dat_filtered, file = "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_filtered.rds")
-```
 
-## Check counts of data at each level of analysis 
 
-# 78,999 - answered MHQ questionnairre - from above
-# 78,361 - removing SCZ, BP diagnosis etc. - from above
-
-# 35,956 Tried presctiption medication 
-
-```{r, }
+#########################################################################
+### Data wrangling - create subset to those taking prescribed medication
 
 # Create a new column that flags rows with 'prescribed medication' in any of the three specified columns
 ukb_adresponse_dat_filtered$has_prescribed_med <- 
@@ -549,12 +457,6 @@ unique_eids_non_users_count <- total_unique_eids - unique_eids_users_count
 # Print the results
 print(paste("Unique IDs of individuals who reported 'prescribed medication':", unique_eids_users_count))
 print(paste("Unique IDs of individuals who have not reported 'prescribed medication':", unique_eids_non_users_count))
-
-```
-
-# 28,673 Tried antidepressants 
-
-```{r, }
 
 # Define the list of antidepressants
 antidepressants <- c("Amitriptyline", "Citalopram", "Dosulepin", "Fluoxetine", "Paroxetine", "Sertraline", "Other depressants")
@@ -588,11 +490,10 @@ unique_eids_non_antidepressant_users_count <- total_unique_eids - unique_eids_an
 # Print the results
 print(paste("Unique IDs of individuals who reported using antidepressants:", unique_eids_antidepressant_users_count))
 print(paste("Unique IDs of individuals who have not reported using antidepressants:", unique_eids_non_antidepressant_users_count))
-```
 
-# 21124 Tried ssri
 
-```{r, }
+#########################################################################
+### Data wrangling - create subset to those taking SSRIs
 
 # Filter the subset to include only those who have reported using antidepressants
 antidepressant_subset <- prescribed_med_subset %>%
@@ -622,11 +523,6 @@ unique_eids_non_ssri_users_count <- total_unique_eids_antidepressant_subset - un
 # Print the results
 print(paste("Unique IDs of individuals who reported using SSRIs:", unique_eids_ssri_users_count))
 print(paste("Unique IDs of individuals who have not reported using SSRIs:", unique_eids_non_ssri_users_count))
-```
-
-
---------------------------------------------------------------------------------------------------------------------------------
-# START ANALYSIS
 
 ## Print summaries and save files
 
@@ -638,11 +534,6 @@ ukb_adresponse_dat_filtered <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/da
 
 ukb_adresponse_dat_analysis <- ukb_adresponse_dat_filtered
 
-print(paste("Columns in the dataframe:", ncol(ukb_adresponse_dat_analysis))) #136
-print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis))) #78361
-
-colnames(ukb_adresponse_dat_analysis)
-
 # Reorder variable names alphabetically
 ukb_adresponse_dat_analysis <- ukb_adresponse_dat_analysis[c("eid", sort(setdiff(names(ukb_adresponse_dat_analysis), "eid")))]
 
@@ -651,13 +542,12 @@ names(ukb_adresponse_dat_analysis)
 
 # Save the ukb_adresponse_dat_filtered to an RDS file
 saveRDS(ukb_adresponse_dat_analysis, file = "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_analysis.rds")
-```
 
 
-### Add PRS and PCs 
+#########################################################################
+### Data collating  - Add PGS and PCs 
 
-``` {r add_prs, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+### -------- Add PGS ------------##
 
 ### Split prs-dat into separate data frames for each ancestry
 prs_afr <- prs_dat$AFR
@@ -733,7 +623,7 @@ prs_eas <- subset(prs_eas, select = -c(FID))
 prs_eur <- subset(prs_eur, select = -c(FID))
 prs_mid <- subset(prs_mid, select = -c(FID))
 
-### Merge msc_ukb_response_df with prs_afr dataframe by "eid"
+### Merge ukb_adresponse_dat_analysis with prs_afr dataframe by "eid"
 # Use all.x = TRUE argument to ensure that all rows from msc_ukb_response_df are included in the merged dataframe, even if no matching "eid" in the polygenic score dataframe.
 ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_afr, by = "eid", all.x = TRUE)
 ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_amr, by = "eid", all.x = TRUE)
@@ -745,8 +635,8 @@ ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_mid, by = 
 
 ### Checks
 # Print a summary to check the results
-print(paste("Columns in the dataframe:", length(colnames(ukb_adresponse_dat_analysis)))) #196 
-print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis))) #78361
+print(paste("Columns in the dataframe:", length(colnames(ukb_adresponse_dat_analysis)))) 
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis)))
 
 
 ### -------- Add PCs ------------##
@@ -762,13 +652,13 @@ ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, pcs_qc, by = "
 
 ### Checks
 # Print a summary to check the results
-print(paste("Columns in the dataframe:", length(colnames(ukb_adresponse_dat_analysis)))) #196 - all variables added
+print(paste("Columns in the dataframe:", length(colnames(ukb_adresponse_dat_analysis)))) 
 
-print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis))) #34943
-print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis))) #76526
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis))) 
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis)))
 
 ukb_adresponse_dat_analysis_full <- ukb_adresponse_dat_analysis
 
 # Save the ukb_adresponse_dat_analysis_full to an RDS file
 saveRDS(ukb_adresponse_dat_analysis_full, file = "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_analysis_full.rds")
-```
+
