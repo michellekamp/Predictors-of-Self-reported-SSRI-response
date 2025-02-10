@@ -1,1 +1,770 @@
+---
+title: "UKb_ descrip_analysis_MHQ2_may_MK"
+author: "Michelle Kamp"
+date: "11/05/2024"
+output: html_document
+---
 
+## Move to the correct directory 
+cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
+
+## Set up interactive session
+srun -p cpu --mem=80G --pty /bin/bash
+
+## Set up R session and load libraries
+module add r 
+R
+```{r library, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+.libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
+library(broom)
+library(data.table) 
+library(tidyverse) 
+library(ggplot2) 
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(vroom)
+library(readr)
+library(gtsummary)
+library(e1071)
+library(forcats)
+library(UpSetR)
+library(cowplot)
+library(gt)
+library(gmodels)
+library(car)
+library(psych)
+```
+
+## Show start time
+```{r starttime, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+cat('The starting time for running this script is', format(Sys.time(), format = "%Y-%m-%d %H:%M:%S"), '\n')
+```
+
+## Define and read in file paths
+```{r file_paths, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+ukb_adresponse_path <- "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/combined_ukbb_mhq2_df.rds"
+cyp2c19_path <- "/datasets/ukbiobank/ukb82087/returns/cyp2c19_met_status.rds"
+prs_path <- "/scratch/prj/ukbiobank/usr/ollie_pain/GenoPredPipe/usr/k1806347/ukb82087/psych_demo.pgs.megaprs_pseudo.ukb82087.RDS"
+
+ukb_adresponse_dat <- readRDS(ukb_adresponse_path)
+cyp2c19_dat <- readRDS(cyp2c19_path)
+prs_dat <-readRDS(prs_path)
+```
+
+### Sanity checks 
+```{r df_checks, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+ncol(ukb_adresponse_dat) #130
+ncol(cyp2c19_dat) #4
+nrow(ukb_adresponse_dat) #502353
+nrow(cyp2c19_dat) #486032
+str(ukb_adresponse_dat) 
+str(cyp2c19_dat)
+str(prs_dat) 
+```
+
+There were `r ncol(ukb_adresponse_dat)` columns in the ukb dataset
+There were `r ncol(cyp2c19_dat)` columns in the combined dataset
+There were `r nrow(ukb_adresponse_dat)` participants in the ukb daset
+There were `r nrow(cyp2c19_dat)` participants in the combined dataset
+
+# Descriptive analysis of UKB MHQ2 AD response datset only 
+
+## Rename variables 
+```{r rename, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(data.table)
+
+ukb_adresponse_dat <- ukb_adresponse_dat %>%
+  rename(
+    eid = "eid",  
+    activities_helped = "activities_helped-0.0",
+    age = "age_attended_assessment_centre-0.0", 
+    age_recruitment = "age_recruitment-0.0",
+    age_first_episode = "age_first_episode-0.0",
+    age_last_episode = "age_last_episode-0.0",
+    alcohol_frequency = "alcohol_frequency-0.0",
+    alcohol_status = "alcohol_status-0.0",
+    amitriptyline_res = "amitriptyline_res-0.0",
+    annual_income = "annual_income-0.0",
+    depression_status = "bipolar_dep_status-0.0",
+    brightening_mood_worst = "brightening_mood_worst-0.0",
+    change_appetite_worst = "change_appetite_worst-0.0",    
+    citalopram_res = "citalopram_res-0.0",
+    dep_related_childbirth = "dep_related_childbirth-0.0",
+    dep_related_trauma_event = "dep_related_trauma_event-0.0",
+    citalopram_res = "citalopram_res-0.0",
+    difficult_concentration_worst = "difficult_concentration_worst-0.0", 
+    difficult_coping_rej_neg = "difficult_coping_rej_neg-0.0",
+    duration_worst = "duration_worst-0.0",
+    diagnosis0 = "diagnosis-0.0",
+    diagnosis1 = "diagnosis-0.1",
+    diagnosis10 =  "diagnosis-0.10",
+    diagnosis11 = "diagnosis-0.11",
+    diagnosis12 = "diagnosis-0.12", 
+    diagnosis13 = "diagnosis-0.13",
+    diagnosis14 = "diagnosis-0.14",
+    diagnosis15 = "diagnosis-0.15",
+    diagnosis16 = "diagnosis-0.16",
+    diagnosis17 = "diagnosis-0.17",
+    diagnosis18 ="diagnosis-0.18",
+    diagnosis19 ="diagnosis-0.19",
+    diagnosis2 = "diagnosis-0.2",
+    diagnosis3 = "diagnosis-0.3", 
+    diagnosis4 = "diagnosis-0.4",
+    diagnosis5 = "diagnosis-0.5",
+    diagnosis6 = "diagnosis-0.6",
+    diagnosis7 = "diagnosis-0.7",
+    diagnosis8 = "diagnosis-0.8",
+    diagnosis9 ="diagnosis-0.9",
+    dosulepin_res = "dosulepin_res-0.0",
+    educational_attain0 = "educational_attain-0.0",
+    educational_attain1 = "educational_attain-0.1",
+    educational_attain2 = "educational_attain-0.2",
+    educational_attain3 = "educational_attain-0.3",
+    educational_attain4 = "educational_attain-0.4",
+    educational_attain5= "educational_attain-0.5",
+    ethnic_background = "ethnic_background-0.0",
+    feelings_guilt_worst = "feelings_guilt_worst-0.0",
+    feelings_heavylimbs_worst = "feelings_heavylimbs_worst-0.0",      
+    feelings_tiredness_worst = "feelings_tiredness_worst-0.0",
+    feelings_worthlessness_worst = "feelings_worthlessness_worst-0.0",
+    fraction_dayaffected_worst = "fraction_dayaffected_worst-0.0",
+    freq_dep_days_worst = "freq_dep_days_worst-0.0",
+    impact_roles_worst = "impact_roles_worst-0.0",             
+    informed_prof_dep = "informed_prof_dep-0.0")
+   
+ ukb_adresponse_dat <- ukb_adresponse_dat %>%
+  rename(
+    father_dep0 = "father_dep-0.0", 
+    father_dep1 = "father_dep-0.1", 
+    father_dep2 = "father_dep-0.2", 
+    father_dep3 = "father_dep-0.3", 
+    father_dep4 = "father_dep-0.4", 
+    father_dep5 = "father_dep-0.5", 
+    father_dep6 = "father_dep-0.6", 
+    father_dep7 = "father_dep-0.7", 
+    father_dep8 = "father_dep-0.8",
+    father_dep9 = "father_dep-0.9",
+    fluoxetine_res = "fluoxetine_res-0.0", 
+    lifetime_episode_no = "lifetime_no_dep_episodes-0.0",
+    loss_interest = "loss_of_interest-0.0",
+    medication_spec0 = "medication_spec-0.0",  
+    medication_spec1 = "medication_spec-0.1",
+    medication_spec2 = "medication_spec-0.2",
+    medication_spec3 = "medication_spec-0.3",
+    medication_spec4 = "medication_spec-0.4",  
+    medication_spec5 = "medication_spec-0.5",
+    medication_spec6 = "medication_spec-0.6",
+    mental_fh0 = "mental_fh-0.0",
+    mental_fh1 = "mental_fh-0.1",                     
+    mental_fh2 = "mental_fh-0.2",
+    mental_fh3 = "mental_fh-0.3",                      
+    mental_fh4 = "mental_fh-0.4",
+    mental_fh5 = "mental_fh-0.5",                     
+    mental_fh6 = "mental_fh-0.6",
+    mental_fh7 = "mental_fh-0.7",                      
+    mental_fh8 = "mental_fh-0.8",
+    met_score = "met_score-0.0", 
+    month_birth = "month_of_birth-0.0",
+    mother_dep0 = "mother_dep-0.0", 
+    mother_dep1 = "mother_dep-0.1", 
+    mother_dep2 = "mother_dep-0.2", 
+    mother_dep3 = "mother_dep-0.3", 
+    mother_dep4 = "mother_dep-0.4", 
+    mother_dep5 = "mother_dep-0.5", 
+    mother_dep6 = "mother_dep-0.6", 
+    mother_dep7 = "mother_dep-0.7", 
+    mother_dep8 = "mother_dep-0.8",
+    mother_dep9 = "mother_dep-0.9",
+    mother_dep10 = "mother_dep-0.10",   
+    neuroticism_score = "neuroticism_score-0.0",
+    other_activities0 = "other_activities-0.0",   
+    other_activities1 ="other_activities-0.1",
+    other_ad_res = "other_ad_res-0.0",
+    paroxetine_res = "paroxetine_res-0.0",
+    sadness_dep =  "sadness_dep-0.0",
+    sertraline_res = "sertraline_res-0.0",
+    sex = "sex-0.0",
+    sibs_dep0 = "sibs_dep-0.0", 
+    sibs_dep1 = "sibs_dep-0.1", 
+    sibs_dep2 = "sibs_dep-0.2", 
+    sibs_dep3 = "sibs_dep-0.3", 
+    sibs_dep4 = "sibs_dep-0.4", 
+    sibs_dep5 = "sibs_dep-0.5", 
+    sibs_dep6 = "sibs_dep-0.6", 
+    sibs_dep7 = "sibs_dep-0.7", 
+    sibs_dep8 = "sibs_dep-0.8",
+    sibs_dep9 = "sibs_dep-0.9",
+    sibs_dep10 = "sibs_dep-0.10",
+    sibs_dep11 = "sibs_dep-0.11", 
+    smoking_status = "smoking_status-0.0",
+    substance_used0 = "substance_used-0.0", 
+    substance_used1 = "substance_used-0.1",
+    substance_used2 = "substance_used-0.2",  
+    tdi = "tdi-0.0",
+    thoughts_death_worst = "thoughts_death_worst-0.0",
+    sleep_changed_dep = "sleep_changed_dep-0.0",
+    sleeping_too_much = "sleeping_too_much-0.0",
+    time_worsemood_worst = "time_worsemood_worst-0.0",
+    trouble_fall_sleep = "trouble_fall_sleep-0.0",
+    waking_too_early_sleep = "waking_too_early_sleep-0.0",
+    weight_change_worst = "weight_change_worst-0.0",
+    year_of_birth = "year_of_birth-0.0")
+
+```
+
+### Sanity checks 
+
+```{r check_2, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+ncol(ukb_adresponse_dat) #130
+nrow(ukb_adresponse_dat) #502353
+```
+
+## Restrict dataset to those who answered yes to sadness and loss of interest
+### Ever had prolonged feelings of sadness (field_id 29011) == Yes
+### Ever had prolonged loss of interest (field_id 29012) == Yes
+
+```{r mhq2_particpants, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+ukb_adresponse_dat_filtered <- ukb_adresponse_dat %>%
+  filter(sadness_dep == "Yes" | loss_interest == "Yes")
+
+# Print the count of individuals remaining 
+number_of_unique_ids <- n_distinct(ukb_adresponse_dat_filtered$eid)
+print(number_of_unique_ids)  #79888 (as per ukb search)
+```
+
+There are `r number_of_unique_ids` individuals when filtering based on who answered yes to the two screening questions.
+
+## Restrict dataset to only unipolar depression with no psychosis, schizophrenia, etc.  
+
+```{r depression_only, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# Store initial number of rows
+initial_count <- nrow(ukb_adresponse_dat_filtered)
+
+# Apply second filter
+ukb_adresponse_dat_filtered2 <- ukb_adresponse_dat_filtered %>%
+  filter(!if_any(starts_with("diagnosis"), ~ . %in% c("Any other type of psychosis or psychotic illness",
+                                                     "Mania, hypomania, bipolar or manic-depression",
+                                                     "Schizophrenia")))
+
+# Count the number of unique IDs after the filter
+number_of_remaining_ids <- n_distinct(ukb_adresponse_dat_filtered2$eid)
+print(number_of_remaining_ids) #78653
+
+# Calculate the number of excluded individuals
+excluded_nondep_count <- initial_count - nrow(ukb_adresponse_dat_filtered2)
+print(excluded_nondep_count)  # e.g., 1235
+```
+
+There are `r number_of_remaining_ids` individuals when removing those with other mental health diagnoses from diagnosis variable.
+'r excluded_nondep_count` are excluded from the dataset based on other mental health diagnoses from diagnosis variable.
+
+## Additional check 
+
+```{r depression_only2, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+table(ukb_adresponse_dat_filtered$depression_status)
+
+# # Filter those who have specific diagnoses in any depression_status column 
+ukb_adresponse_dat_filtered <- ukb_adresponse_dat_filtered2 %>%
+  # Exclude individuals with any specified diagnoses in diagnosis columns
+  filter(!if_any(starts_with("depression_status"), ~ . %in% c("Bipolar I Disorder",
+                                                      "Bipolar II Disorder")))
+
+# Calculate the total number of excluded individuals
+excluded_nondep_count2 <- initial_count - nrow(ukb_adresponse_dat_filtered)
+print(excluded_nondep_count2)  # e.g., 1527
+
+
+print(paste("Columns in the dataframe:", ncol(ukb_adresponse_dat_filtered))) #121
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_filtered))) #78361
+print(paste("Total number of particpants removed:", print(excluded_nondep_count2))) #1527
+
+```
+
+There are `r nrow(ukb_adresponse_dat_filtered)` individuals when removing those with other mental health diagnoses from depression_status variable.
+
+## **Data wrangling - clean, create and order variables**
+
+### Develop family history variable
+
+```{r family_history, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# Ensure df is treated as a dataframe
+ukb_adresponse_dat_filtered <- as.data.frame(ukb_adresponse_dat_filtered)
+
+# Apply the transformations
+ukb_adresponse_dat_filtered <- ukb_adresponse_dat_filtered %>%
+  rowwise() %>%
+  mutate(
+    Father_dep = if_else(any(c_across(starts_with("father_dep")) == "Severe depression", na.rm = TRUE), "Yes", "No"),
+    Mother_dep = if_else(any(c_across(starts_with("mother_dep")) == "Severe depression", na.rm = TRUE), "Yes", "No"),
+    Sibs_dep = if_else(any(c_across(starts_with("sibs_dep")) == "Severe depression", na.rm = TRUE), "Yes", "No")
+  ) %>%
+  ungroup()
+
+### Add a family history variable
+ukb_adresponse_dat_filtered$family_history <- ifelse(ukb_adresponse_dat_filtered$Father_dep == "Yes" | 
+                                               ukb_adresponse_dat_filtered$Mother_dep == "Yes" | 
+                                               ukb_adresponse_dat_filtered$Sibs_dep == "Yes", 
+                                             "Yes", "No")
+
+table(ukb_adresponse_dat_filtered$family_history)
+
+```
+
+### Develop highest education - Educational attainment variable
+
+```{r educational_attainment, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Replace -3 with "Prefer not to answer" across all relevant columns
+ukb_adresponse_dat_filtered[paste0("educational_attain", 0:5)][ukb_adresponse_dat_filtered[paste0("educational_attain", 0:5)] == -3] <- "Prefer not to answer"
+
+# Combining columns with a semicolon as a delimiter (as university degree is two words)
+ukb_adresponse_dat_filtered$combined_education <- apply(ukb_adresponse_dat_filtered[,paste0("educational_attain", 0:5)], 1, function(x) {
+  paste(na.omit(x), collapse=";")
+})
+
+# Define Educational Levels
+education_levels <- factor(levels = c("Prefer not to answer", "None of the above", "Secondary", "Vocational", "Further", "University degree"), ordered = TRUE)
+
+# Determine the Highest Level of Education
+ukb_adresponse_dat_filtered$highest_education <- sapply(
+  strsplit(ukb_adresponse_dat_filtered$combined_education, ";"), 
+  function(x) {
+    x <- na.omit(x)  # Remove NA values
+    if (length(x) == 0) {
+      return("NA")  
+    }
+    levels <- factor(x, levels = c("Prefer not to answer", "None of the above", "Secondary", "Vocational", "Further", "University degree"), ordered = TRUE)
+    as.character(max(levels))
+  }
+)
+
+#Checks
+unique(ukb_adresponse_dat_filtered$highest_education)
+table(ukb_adresponse_dat_filtered$highest_education)
+
+```
+
+### Order factor levels of multiple variables
+
+```{r variable_factorisation, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+ukb_adresponse_dat_filtered$ethnic_background <- factor(ukb_adresponse_dat_filtered$ethnic_background, 
+                                                levels = c("Asian", "Black", "Mixed", "White", "Not available"))
+
+ukb_adresponse_dat_filtered$annual_income <- factor(ukb_adresponse_dat_filtered$annual_income, 
+                                             levels = c("Less than 18,000", "18,000 to 30,999", 
+                                                        "31,000 to 51,999", "52,000 to 100,000",
+                                                        "Greater than 100,000", "Do not know", "Prefer not to answer"))
+
+ukb_adresponse_dat_filtered$alcohol_frequency <- factor(ukb_adresponse_dat_filtered$alcohol_frequency, 
+                                            levels = c("Daily", "1-2 times/week", "3-4 times/week", "1-3 times/month",
+                                                       "Special occasions", "Never", "Not available"))
+
+ukb_adresponse_dat_filtered$alcohol_status <- factor(ukb_adresponse_dat_filtered$alcohol_status, 
+                                                levels = c("Current", "Previous", "Never", "Not available"))
+
+ukb_adresponse_dat_filtered$smoking_status <- factor(ukb_adresponse_dat_filtered$smoking_status, 
+                                             levels = c("Current", "Previous", "Never", "Not available"))
+
+### clinical
+
+
+ukb_adresponse_dat_filtered$brightening_mood_worst <- factor(ukb_adresponse_dat_filtered$brightening_mood_worst, 
+                                             levels = c("Yes", "No", "Do not know", "Prefer to answer", "Not available"))
+
+ukb_adresponse_dat_filtered$change_appetite_worst <- factor(ukb_adresponse_dat_filtered$change_appetite_worst, 
+                                             levels = c("Decreased appetite", "Increased appetite", "No change in appetite", "Do not know", "Prefer to answer", NA))
+
+ukb_adresponse_dat_filtered$difficult_concentration_worst <- factor(ukb_adresponse_dat_filtered$difficult_concentration_worst, 
+                                             levels = c("Yes", "No", "Do not know", "Prefer to answer", NA))
+
+ukb_adresponse_dat_filtered$difficult_coping_rej_neg <- factor(ukb_adresponse_dat_filtered$difficult_coping_rej_neg, 
+                                             levels = c("Yes, caused problems in work/social relationships", 
+                                                        "Yes, but no problems in work/social relationships",
+                                                        "No, this does not sound like me", "Prefer to answer", NA))
+
+
+ukb_adresponse_dat_filtered$duration_worst <- factor(ukb_adresponse_dat_filtered$duration_worst, 
+                                                 levels = c("Less than a month", "Between 1 and 3 months", 
+                                                 "Over 3 months, but less than 6 months", "Over 6 months, but less than 12 months","1 to 2 years", "Over 2 years", "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$feelings_guilt_worst <- factor(ukb_adresponse_dat_filtered$feelings_guilt_worst, 
+                                                 levels = c("Yes", "No", "Do not know", "Prefer to answer", NA))
+
+ukb_adresponse_dat_filtered$feelings_heavylimbs_worst <- factor(ukb_adresponse_dat_filtered$feelings_heavylimbs_worst, 
+                                                 levels = c("Yes", "No", "Do not know", "Prefer to answer", NA))
+
+ukb_adresponse_dat_filtered$feelings_tiredness_worst <- factor(ukb_adresponse_dat_filtered$feelings_tiredness_worst, 
+                                                 levels = c("Yes", "No", "Do not know", "Prefer to answer", NA))
+
+ukb_adresponse_dat_filtered$feelings_worthlessness_worst <- factor(ukb_adresponse_dat_filtered$feelings_worthlessness_worst, 
+                                                 levels = c("Yes", "No", "Do not know", "Prefer to answer", NA))
+
+ukb_adresponse_dat_filtered$fraction_dayaffected_worst <- factor(ukb_adresponse_dat_filtered$fraction_dayaffected_worst, 
+                                                 levels = c("All day long", "Most of the day", "About half of the day", 
+                                                            "Less than half of the day", "Do not know", "Prefer not to answer", 
+                                                            NA))
+
+
+ukb_adresponse_dat_filtered$freq_dep_days_worst <- factor(ukb_adresponse_dat_filtered$freq_dep_days_worst, 
+                                              levels = c("Every day", "Almost every day", "Less often", "Do not know", 
+                                              "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$impact_roles_worst <- factor(ukb_adresponse_dat_filtered$impact_roles_worst, 
+                                                 levels = c("A lot", "Somewhat", "A little", "Not at all", "Prefer not to answer", 
+                                                           NA))
+
+ukb_adresponse_dat_filtered$thoughts_death_worst <- factor(ukb_adresponse_dat_filtered$thoughts_death_worst, 
+                                             levels = c("Yes", "No", "Do not know", "Prefer to answer", NA))
+
+ukb_adresponse_dat_filtered$sleep_changed_dep <- factor(ukb_adresponse_dat_filtered$sleep_changed_dep, 
+                                              levels = c("Yes", "No", "Do not know", "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$sleeping_too_much <- factor(ukb_adresponse_dat_filtered$sleeping_too_much, 
+                                              levels = c("Yes", "No", "Not available"))
+
+ukb_adresponse_dat_filtered$time_worsemood_worst <- factor(ukb_adresponse_dat_filtered$time_worsemood_worst, 
+                                              levels = c("In the morning", "In the evening or at night", "Mood did not vary", 
+                                              "Do not know", "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$trouble_fall_sleep <- factor(ukb_adresponse_dat_filtered$trouble_fall_sleep, 
+                                              levels = c("Yes", "No", NA))
+
+ukb_adresponse_dat_filtered$waking_too_early_sleep <- factor(ukb_adresponse_dat_filtered$waking_too_early_sleep, 
+                                              levels = c("Yes", "No", NA))
+
+
+ukb_adresponse_dat_filtered$weight_change_worst <- factor(ukb_adresponse_dat_filtered$weight_change_worst, 
+                                               levels = c("Gained weight", "Lost weight", "Both gained and lost some weight during this time", "Stayed about the same or was on a diet", "Do not know", "Prefer not to answer", NA))
+
+
+ukb_adresponse_dat_filtered$dep_related_childbirth <- factor(ukb_adresponse_dat_filtered$dep_related_childbirth, 
+                                             levels = c("Yes", "No", "Do not know", "Prefer to answer","Not applicable", NA))
+
+ukb_adresponse_dat_filtered$dep_related_trauma_event <- factor(ukb_adresponse_dat_filtered$dep_related_trauma_event, 
+                                             levels = c("Yes", "No", "Do not know", "Prefer to answer","Not applicable", NA))
+
+ukb_adresponse_dat_filtered$thoughts_death_worst <- factor(ukb_adresponse_dat_filtered$thoughts_death_worst, 
+                                             levels = c("Yes", "No", "Do not know", "Prefer to answer", "Not available"))
+
+ukb_adresponse_dat_filtered$amitriptyline_res <- factor(ukb_adresponse_dat_filtered$amitriptyline_res, 
+                                                       levels = c("Yes", "No", "Do not know", "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$citalopram_res <- factor(ukb_adresponse_dat_filtered$citalopram_res, 
+                                                       levels = c("Yes", "No", "Do not know", "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$dosulepin_res <- factor(ukb_adresponse_dat_filtered$dosulepin_res, 
+                                                       levels = c("Yes", "No", "Do not know", "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$fluoxetine_res <- factor(ukb_adresponse_dat_filtered$fluoxetine_res, 
+                                                       levels = c("Yes", "No", "Do not know", "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$paroxetine_res <- factor(ukb_adresponse_dat_filtered$paroxetine_res, 
+                                                       levels = c("Yes", "No", "Do not know", "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$sertraline_res <- factor(ukb_adresponse_dat_filtered$sertraline_res, 
+                                                       levels = c("Yes", "No", "Do not know", "Prefer not to answer", NA))
+
+ukb_adresponse_dat_filtered$other_ad_res <- factor(ukb_adresponse_dat_filtered$other_ad_res, 
+                                                       levels = c("Yes", "No", "Do not know", "Prefer not to answer", NA))
+
+
+ukb_adresponse_dat_filtered$informed_prof_dep <- factor(ukb_adresponse_dat_filtered$informed_prof_dep, 
+                                                       levels = c("Yes", "No", "Not available"))
+
+ukb_adresponse_dat_filtered$highest_education <- factor(ukb_adresponse_dat_filtered$highest_education, 
+                                                            levels = c("University degree", "Vocational", "Further", "Secondary", "None of the above", "Prefer not to answer"))
+
+
+```
+
+
+## Print summaries and save files 
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+print(paste("Columns in the dataframe:", ncol(ukb_adresponse_dat_filtered))) #136
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_filtered))) #78361
+
+# Save the ukb_adresponse_dat_filtered to an RDS file
+saveRDS(ukb_adresponse_dat_filtered, file = "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_filtered.rds")
+```
+
+## Check counts of data at each level of analysis 
+
+# 78,999 - answered MHQ questionnairre - from above
+# 78,361 - removing SCZ, BP diagnosis etc. - from above
+
+# 35,956 Tried presctiption medication 
+
+```{r, }
+
+# Create a new column that flags rows with 'prescribed medication' in any of the three specified columns
+ukb_adresponse_dat_filtered$has_prescribed_med <- 
+  stringr::str_detect(ukb_adresponse_dat_filtered$substance_used0, regex("\\bprescribed medication\\b", ignore_case = TRUE)) |
+  stringr::str_detect(ukb_adresponse_dat_filtered$substance_used1, regex("\\bprescribed medication\\b", ignore_case = TRUE)) |
+  stringr::str_detect(ukb_adresponse_dat_filtered$substance_used2, regex("\\bprescribed medication\\b", ignore_case = TRUE))
+
+# Filter rows where 'has_prescribed_med' is TRUE and count unique eIDs
+unique_eids_users_count <- ukb_adresponse_dat_filtered %>%
+  filter(has_prescribed_med) %>%
+  distinct(eid) %>%
+  nrow()
+
+# Calculate the total number of unique eIDs in the dataset
+total_unique_eids <- ukb_adresponse_dat_filtered %>%
+  distinct(eid) %>%
+  nrow()
+
+# Calculate the number of non-users
+unique_eids_non_users_count <- total_unique_eids - unique_eids_users_count
+
+# Print the results
+print(paste("Unique IDs of individuals who reported 'prescribed medication':", unique_eids_users_count))
+print(paste("Unique IDs of individuals who have not reported 'prescribed medication':", unique_eids_non_users_count))
+
+```
+
+# 28,673 Tried antidepressants 
+
+```{r, }
+
+# Define the list of antidepressants
+antidepressants <- c("Amitriptyline", "Citalopram", "Dosulepin", "Fluoxetine", "Paroxetine", "Sertraline", "Other depressants")
+
+# First filter the subset where 'prescribed medication' is indicated in any of the substance_used columns
+prescribed_med_subset <- ukb_adresponse_dat_filtered %>%
+  filter(
+    str_detect(substance_used0, regex("\\bprescribed medication\\b", ignore_case = TRUE)) |
+    str_detect(substance_used1, regex("\\bprescribed medication\\b", ignore_case = TRUE)) |
+    str_detect(substance_used2, regex("\\bprescribed medication\\b", ignore_case = TRUE))
+  )
+
+# Create a logical vector to flag rows with any of the antidepressants in the medication_spec0 column
+prescribed_med_subset$has_antidepressant <- 
+  prescribed_med_subset$medication_spec0 %in% antidepressants
+
+# Filter rows where 'has_antidepressant' is TRUE and count unique eIDs
+unique_eids_antidepressant_users_count <- prescribed_med_subset %>%
+  filter(has_antidepressant) %>%
+  distinct(eid) %>%
+  nrow()
+
+# Calculate the total number of unique eIDs in the prescribed medication subset
+total_unique_eids <- prescribed_med_subset %>%
+  distinct(eid) %>%
+  nrow()
+
+# Calculate the number of non-users
+unique_eids_non_antidepressant_users_count <- total_unique_eids - unique_eids_antidepressant_users_count
+
+# Print the results
+print(paste("Unique IDs of individuals who reported using antidepressants:", unique_eids_antidepressant_users_count))
+print(paste("Unique IDs of individuals who have not reported using antidepressants:", unique_eids_non_antidepressant_users_count))
+```
+
+# 21124 Tried ssri
+
+```{r, }
+
+# Filter the subset to include only those who have reported using antidepressants
+antidepressant_subset <- prescribed_med_subset %>%
+  filter(has_antidepressant)
+
+# Define the SSRIs
+ssris <- c("Citalopram", "Fluoxetine", "Paroxetine", "Sertraline")
+
+# Create a logical vector to flag rows with any of the SSRIs in the medication_spec0 column
+antidepressant_subset$has_ssri <- 
+  antidepressant_subset$medication_spec0 %in% ssris
+
+# Filter rows where 'has_ssri' is TRUE and count unique eIDs
+unique_eids_ssri_users_count <- antidepressant_subset %>%
+  filter(has_ssri) %>%
+  distinct(eid) %>%
+  nrow()
+
+# Calculate the total number of unique eIDs in the antidepressant subset
+total_unique_eids_antidepressant_subset <- antidepressant_subset %>%
+  distinct(eid) %>%
+  nrow()
+
+# Calculate the number of non-SSRI users
+unique_eids_non_ssri_users_count <- total_unique_eids_antidepressant_subset - unique_eids_ssri_users_count
+
+# Print the results
+print(paste("Unique IDs of individuals who reported using SSRIs:", unique_eids_ssri_users_count))
+print(paste("Unique IDs of individuals who have not reported using SSRIs:", unique_eids_non_ssri_users_count))
+```
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+# START ANALYSIS
+
+## Print summaries and save files
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# Read in file
+ukb_adresponse_dat_filtered <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_filtered.rds")
+
+ukb_adresponse_dat_analysis <- ukb_adresponse_dat_filtered
+
+print(paste("Columns in the dataframe:", ncol(ukb_adresponse_dat_analysis))) #136
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis))) #78361
+
+colnames(ukb_adresponse_dat_analysis)
+
+# Reorder variable names alphabetically
+ukb_adresponse_dat_analysis <- ukb_adresponse_dat_analysis[c("eid", sort(setdiff(names(ukb_adresponse_dat_analysis), "eid")))]
+
+# check reordering
+names(ukb_adresponse_dat_analysis)
+
+# Save the ukb_adresponse_dat_filtered to an RDS file
+saveRDS(ukb_adresponse_dat_analysis, file = "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_analysis.rds")
+```
+
+
+### Add PRS and PCs 
+
+``` {r add_prs, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+### Split prs-dat into separate data frames for each ancestry
+prs_afr <- prs_dat$AFR
+prs_amr <- prs_dat$AMR
+prs_csa <- prs_dat$CSA
+prs_eas <- prs_dat$EAS
+prs_eur <- prs_dat$EUR
+prs_mid <- prs_dat$MID
+
+
+### Modify column names in the prs_anc dataframe
+colnames(prs_afr) <- sapply(colnames(prs_afr), function(col_name) {
+  if (col_name %in% c("FID", "IID")) {
+    col_name  # Return the column name unchanged if it's FID or IID
+  } else {
+    paste0(col_name, "_AFR")  # Append '_AFR' to the column name
+  }
+})
+
+colnames(prs_amr) <- sapply(colnames(prs_amr), function(col_name) {
+  if (col_name %in% c("FID", "IID")) {
+    col_name  # Return the column name unchanged if it's FID or IID
+  } else {
+    paste0(col_name, "_AMR")  # Append '_AMR' to the column name
+  }
+})
+
+colnames(prs_csa) <- sapply(colnames(prs_csa), function(col_name) {
+  if (col_name %in% c("FID", "IID")) {
+    col_name  # Return the column name unchanged if it's FID or IID
+  } else {
+    paste0(col_name, "_CSA")  # Append '_CSA' to the column name
+  }
+})
+
+colnames(prs_eas) <- sapply(colnames(prs_eas), function(col_name) {
+  if (col_name %in% c("FID", "IID")) {
+    col_name  # Return the column name unchanged if it's FID or IID
+  } else {
+    paste0(col_name, "_EAS")  # Append '_EAS' to the column name
+  }
+})
+
+colnames(prs_eur) <- sapply(colnames(prs_eur), function(col_name) {
+  if (col_name %in% c("FID", "IID")) {
+    col_name  # Return the column name unchanged if it's FID or IID
+  } else {
+    paste0(col_name, "_EUR")  # Append '_EUR' to the column name
+  }
+})
+
+colnames(prs_mid) <- sapply(colnames(prs_mid), function(col_name) {
+  if (col_name %in% c("FID", "IID")) {
+    col_name  # Return the column name unchanged if it's FID or IID
+  } else {
+    paste0(col_name, "_MID")  # Append '_MID' to the column name
+  }
+})
+
+### Ensure partcipant ID matches between datasets
+colnames(prs_afr)[colnames(prs_afr) == "IID"] <- "eid"
+colnames(prs_amr)[colnames(prs_amr) == "IID"] <- "eid"
+colnames(prs_csa)[colnames(prs_csa) == "IID"] <- "eid"
+colnames(prs_eas)[colnames(prs_eas) == "IID"] <- "eid"
+colnames(prs_eur)[colnames(prs_eur) == "IID"] <- "eid"
+colnames(prs_mid)[colnames(prs_mid) == "IID"] <- "eid"
+
+### Remove the "FID" column from prs_anc dataframe
+prs_afr <- subset(prs_afr, select = -c(FID))
+prs_amr <- subset(prs_amr, select = -c(FID))
+prs_csa <- subset(prs_csa, select = -c(FID))
+prs_eas <- subset(prs_eas, select = -c(FID))
+prs_eur <- subset(prs_eur, select = -c(FID))
+prs_mid <- subset(prs_mid, select = -c(FID))
+
+### Merge msc_ukb_response_df with prs_afr dataframe by "eid"
+# Use all.x = TRUE argument to ensure that all rows from msc_ukb_response_df are included in the merged dataframe, even if no matching "eid" in the polygenic score dataframe.
+ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_afr, by = "eid", all.x = TRUE)
+ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_amr, by = "eid", all.x = TRUE)
+ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_csa, by = "eid", all.x = TRUE)
+ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_eas, by = "eid", all.x = TRUE)
+ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_eur, by = "eid", all.x = TRUE)
+ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, prs_mid, by = "eid", all.x = TRUE)
+
+
+### Checks
+# Print a summary to check the results
+print(paste("Columns in the dataframe:", length(colnames(ukb_adresponse_dat_analysis)))) #196 
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis))) #78361
+
+
+### -------- Add PCs ------------##
+
+### Read in pcs file for project 82087
+pcs_qc <- read.table("/scratch/prj/ukbiobank/ukb82087/qc/ukb82087_batch_centre_10pcs.txt", sep = " ", header = TRUE)
+
+### Ensure partcipant ID matches between datasets
+colnames(pcs_qc)[colnames(pcs_qc) == "IID"] <- "eid"
+pcs_qc <- subset(pcs_qc, select = -c(FID, Sex))
+
+ukb_adresponse_dat_analysis <- merge(ukb_adresponse_dat_analysis, pcs_qc, by = "eid")
+
+### Checks
+# Print a summary to check the results
+print(paste("Columns in the dataframe:", length(colnames(ukb_adresponse_dat_analysis)))) #196 - all variables added
+
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis))) #34943
+print(paste("Number of rows in the dataframe:", nrow(ukb_adresponse_dat_analysis))) #76526
+
+ukb_adresponse_dat_analysis_full <- ukb_adresponse_dat_analysis
+
+# Save the ukb_adresponse_dat_analysis_full to an RDS file
+saveRDS(ukb_adresponse_dat_analysis_full, file = "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_analysis_full.rds")
+```
