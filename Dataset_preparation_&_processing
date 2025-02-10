@@ -5,19 +5,21 @@
 ### PREPARE AND PROCESS DATASET 
 #########################################################################
 
-
-
-## Move to the correct directory 
-cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
-
-## Set up interactive session
+#########################################################################
+### Preamble
+#########################################################################
+### ssh into create
+### Request interactive session
 srun -p cpu --mem=80G --pty /bin/bash
-
-## Set up R session and load libraries
+### Change directory
+cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
+### Launch R
 module add r 
 R
-```{r library, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+
+#########################################################################
+### Written in R from here
+#########################################################################
 
 .libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
 library(broom)
