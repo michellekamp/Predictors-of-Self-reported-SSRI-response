@@ -1,7 +1,21 @@
+#########################################################################
+### Code used to assess the association between SSRI self-reported non-response and derived Polygenic scores (PGS) 
+### Outcome variables: SSRI, SSRI_conservative, Citalopram, Fluoxetine, Paroxetine, Sertraline response
+### Predictor variables -  PGS for psychaitric conditions and antidepressant response 
+  ## Psychiatric conditions 
+    # Major depressive disorder - DEPR07_EUR
+    # Schizophrenia - SCHI
+    # Bipolar Disorder - BIPO02_EUR
+    # ADHD - ADHD05_EUR
+    # Autism - AUTI07_EUR
+   ## Antidepressant response 
+    # Non-remission - ADnorem
+    # Percentage improvement - ADperc
 
 #########################################################################
-### ASSOCIATION TESTING 
+### UNDERTAKE ASSOCIATION TESTING 
 #########################################################################
+
 #########################################################################
 ### Preamble
 #########################################################################
@@ -13,9 +27,11 @@ cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/
 ### Launch R
 module add r 
 R
+
 #########################################################################
 ### Written in R from here
 #########################################################################
+
 ### Set library path
 .libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
 ### Load necessary libraries
@@ -38,11 +54,8 @@ library(gmodels)
 library(car)
 library(psych)
 library(fmsb)
-#########################################################################
-### Set up paths
-pgx_path <- "/datasets/ukbiobank/ukb82087/returns/FFR_33722_1/pgx_calls.imputed_callset_DAedit.csv"
-id_path <- "/datasets/ukbiobank/ukb82087/returns/ukb82087bridge33722.txt"
-### Read in files...
+
+### Read in file containg outcome, PGS variables and covariates
 ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.rds")
 
 # Verify dataset
@@ -50,29 +63,24 @@ print(table(ukb_adresponse_dat_analysis_full$Citalopram))
 print(table(ukb_adresponse_dat_analysis_full$Fluoxetine)) 
 print(table(ukb_adresponse_dat_analysis_full$Paroxetine)) 
 print(table(ukb_adresponse_dat_analysis_full$Sertraline)) 
-print(table(ukb_adresponse_dat_analysis_full$sex)) 
-print(table(ukb_adresponse_dat_analysis_full$ethnic_background)) 
 
 #########################################################################
 ### Set up association analysis parameters
+#########################################################################
+
 ### Define the predictors
 predictors <- c("DEPR07_EUR", "ADHD05_EUR", "AUTI07_EUR", "BIPO02_EUR", "SCHI04_EUR", "ADnorem_EUR", "ADperc_EUR")
 ### Define the covariates
 covariates <- c("age", "sex", "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "Batch")
 ### Subset data for White ethnic background
  subset_data <- ukb_adresponse_dat_analysis_full[ukb_adresponse_dat_analysis_full$ethnic_background == "White", ]
-### Sanity check  
-print(table(subset_data$Citalopram)) 
-print(table(subset_data$Fluoxetine)) 
-print(table(subset_data$Paroxetine)) 
-print(table(subset_data$Sertraline)) 
+# Verify dataset
+print(table(subset_data$ethnic_background)) 
 
-  
 #########################################################################
-### Run association analysis - example Citalopram
+### Run association analysis 
 #########################################################################
-### Univariable
-#########################################################################
+
 ### CITALOPRAM
 # Initialize dataframe to store all results
 all_univariate_prs_cit <- data.frame()
@@ -138,10 +146,11 @@ adjusted_p_values <- p.adjust(all_univariate_prs_cit$p.value, method = "bonferro
 ### Determine if an association is significant based on the Bonferroni corrected p-values
 all_univariate_prs_cit$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
 
-### Correct for multiple testing across predictor categories - 55  
-stringent_alpha = alpha / 55
+### Correct for multiple testing across predictor categories - 55  - and 6 outcomes results in p-value threshold of 0.05/330
+stringent_alpha = alpha / 330
 ### Determine if an association is significant based when accounting for all predictors
 all_univariate_prs_cit$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+
 #########################################################################
 ### FLUOXETINE
 # Initialize dataframe to store all results
@@ -208,10 +217,11 @@ adjusted_p_values <- p.adjust(all_univariate_prs_flu$p.value, method = "bonferro
 ### Determine if an association is significant based on the Bonferroni corrected p-values
 all_univariate_prs_flu$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
 
-### Correct for multiple testing across predictor categories - 55  
-stringent_alpha = alpha / 55
+### Correct for multiple testing across predictor categories - 55  - and 6 outcomes results in p-value threshold of 0.05/330 
+stringent_alpha = alpha / 330
 ### Determine if an association is significant based when accounting for all predictors
 all_univariate_prs_flu$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+
 #########################################################################
 ### PAROXETINE
 # Initialize dataframe to store all results
@@ -279,10 +289,11 @@ adjusted_p_values <- p.adjust(all_univariate_prs_par$p.value, method = "bonferro
 ### Determine if an association is significant based on the Bonferroni corrected p-values
 all_univariate_prs_par$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
 
-### Correct for multiple testing across predictor categories - 55  
-stringent_alpha = alpha / 55
+### Correct for multiple testing across predictor categories - 55  - and 6 outcomes results in p-value threshold of 0.05/330 
+stringent_alpha = alpha / 330
 ### Determine if an association is significant based when accounting for all predictors
 all_univariate_prs_par$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+
 #########################################################################
 ### SERTRALINE 
 # Initialize dataframe to store all results
@@ -349,10 +360,11 @@ adjusted_p_values <- p.adjust(all_univariate_prs_ser$p.value, method = "bonferro
 ### Determine if an association is significant based on the Bonferroni corrected p-values
 all_univariate_prs_ser$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
 
-### Correct for multiple testing across predictor categories - 55  
-stringent_alpha = alpha / 55
+### Correct for multiple testing across predictor categories - 55  - and 6 outcomes results in p-value threshold of 0.05/330  
+stringent_alpha = alpha / 330
 ### Determine if an association is significant based when accounting for all predictors
 all_univariate_prs_ser$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+
 #########################################################################
 ### SSRI all
 ### Factorise SSRI_status_all 
@@ -424,10 +436,11 @@ adjusted_p_values <- p.adjust(all_univariate_prs_ssri$p.value, method = "bonferr
 ### Determine if an association is significant based on the Bonferroni corrected p-values
 all_univariate_prs_ssri$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
 
-### Correct for multiple testing across predictor categories - 55  
-stringent_alpha = alpha / 55
+### Correct for multiple testing across predictor categories - 55  - and 6 outcomes results in p-value threshold of 0.05/330  
+stringent_alpha = alpha / 330
 ### Determine if an association is significant based when accounting for all predictors
 all_univariate_prs_ssri$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
+
 #########################################################################
 ### SSRI all conservative
 ### Factorise SSRI-status_all_cons
@@ -499,8 +512,8 @@ adjusted_p_values <- p.adjust(all_univariate_prs_ssri_cons$p.value, method = "bo
 ### Determine if an association is significant based on the Bonferroni corrected p-values
 all_univariate_prs_ssri_cons$corrected_significance <- ifelse(adjusted_p_values < alpha, "Significant", "Not Significant")
 
-### Correct for multiple testing across predictor categories - 55  
-stringent_alpha = alpha / 55
+### Correct for multiple testing across predictor categories - 55  - and 6 outcomes results in p-value threshold of 0.05/330 
+stringent_alpha = alpha / 330
 ### Determine if an association is significant based when accounting for all predictors
 all_univariate_prs_ssri_cons$max_significance <- ifelse(p.value < stringent_alpha, "Significant", "Not Significant")
 
@@ -510,6 +523,7 @@ all_univariate_prs_ssri_cons$max_significance <- ifelse(p.value < stringent_alph
 # Combine the data frames using rbind()
 all_univariate_prs_white <- rbind(all_univariate_prs_cit, all_univariate_prs_flu, all_univariate_prs_par, all_univariate_prs_ser, 
                                   all_univariate_prs_ssri, all_univariate_prs_ssri_cons)
+
 # Save the dataframe to a CSV file
 write.csv(all_univariate_prs_white, "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/all_univariate_PRS_Results.csv", row.names = FALSE)
 
@@ -660,60 +674,6 @@ prs_plot <- ggplot(all_univariate_prs_white, aes(x = term, y = OR, color = Drug,
     legend.text = element_text(size = 13),
     legend.key.width = unit(1, "cm"),  # Increase space within legend items horizontally
     legend.key.height = unit(1, "cm")  # Increase space within legend items vertically
-  )
-  
-# Add p-values as text for "ADnorem" term with specific positioning
-prs_plot <- prs_plot +
-  geom_text(
-    data = subset(all_univariate_prs_white, final_significance == "Significant" & term == "ADnorem"),  # Filter for "ADnorem" term
-    aes(label = P_label),  # Use formatted p-values
-    color = "black",  # Set text color to black
-    position = position_dodge(width = 0.4),
-    vjust = 0.4,  # Adjust vertical position for "ADnorem"
-    hjust = -1.1,  # Adjust horizontal position for "ADnorem"
-    size = 3.5,
-    angle = 90, # Adjust text size
-    parse = TRUE  # Parse the text to correctly interpret math expressions
-  )
-
-# Add p-values as text for "SCHI" term with specific positioning
-prs_plot <- prs_plot +
-  geom_text(
-    data = subset(all_univariate_prs_white, final_significance == "Significant" & term == "SCHI"),  # Filter for "SCHI" term
-    aes(label = P_label),  # Use formatted p-values
-    color = "black",  # Set text color to black
-    position = position_dodge(width = 0.4),
-    vjust = -0.9,  # Adjust vertical position for "SCHI"
-    hjust = -0.4,  # Adjust horizontal position for "SCHI"
-    size = 3.5,
-    angle = 90, # Adjust text size
-    parse = TRUE  # Parse the text to correctly interpret math expressions
-  )
-
-prs_plot <- prs_plot +
-  geom_text(
-    data = subset(all_univariate_prs_white, final_significance == "Significant" & term == "ADHD" & Drug == "SSRI\n (Y = 15192, N = 3889)"),  # Filter for "AUTI" term and SSRI
-    aes(label = P_label),  # Use formatted p-values
-    color = "black",  # Set text color to black
-    position = position_dodge(width = 0.4),
-    vjust = -1.1,  # Adjust vertical position for better alignment
-    hjust = -0.4,  # Adjust horizontal position
-    size = 3.5,  # Adjust text size
-    angle = 90,  # Rotate text vertically
-    parse = TRUE  # Parse the text to correctly interpret math expressions
-  )
-
-prs_plot <- prs_plot +
-  geom_text(
-    data = subset(all_univariate_prs_white, final_significance == "Significant" & term == "ADHD" & Drug == "Fluoxetine\n (Y = 6490, N = 1806)"),  # Filter for "AUTI" term and SSRI
-    aes(label = P_label),  # Use formatted p-values
-    color = "black",  # Set text color to black
-    position = position_dodge(width = 0.4),
-    vjust = 0.2,  # Adjust vertical position for better alignment
-    hjust = -0.6,  # Adjust horizontal position
-    size = 3.5,  # Adjust text size
-    angle = 90,  # Rotate text vertically
-    parse = TRUE  # Parse the text to correctly interpret math expressions
   )
   
   prs_plot <- prs_plot +
