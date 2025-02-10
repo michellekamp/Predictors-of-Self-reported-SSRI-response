@@ -1,9 +1,11 @@
----
-title: "UKb_ descrip_analysis_MHQ2_may_MK"
-author: "Michelle Kamp"
-date: "11/05/2024"
-output: html_document
----
+#########################################################################
+### Code used to prepare and process dataset for analysis of SSRI self-reported non-response 
+
+#########################################################################
+### PREPARE AND PROCESS DATASET 
+#########################################################################
+
+
 
 ## Move to the correct directory 
 cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
