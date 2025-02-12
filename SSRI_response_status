@@ -1,4 +1,82 @@
-## Set up AD response phenotypes - SSRI only - all SSRI
+#########################################################################
+### Code used to derive the SSRI response status and SSRi Response conservative variable
+### Logic used for variable derivation 
+
+### Table: Decision framework for defining antidepressant response outcomes among participants using at least one Selective Serotonin Reuptake Inhibitor (SSRI)
+
+| Number of drugs | Drug specific outcomes | SSRI phenotype | SSRI conservative phenotype |
+|-----------------|------------------------|----------------|------------------------------|
+| 1               | Y                      | Y              | Y                            |
+|                 | N                      | N              | N                            |
+| 2               | YY                     | Y              | Y                            |
+|                 | YN                     | N              | NA                           |
+|                 | NN                     | N              | N                            |
+| 3               | YYY                    | Y              | Y                            |
+|                 | YYN                    | N              | NA                           |
+|                 | YNN                    | N              | N                            |
+|                 | NNN                    | N              | N                            |
+| 4               | YYYY                   | Y              | Y                            |
+|                 | YYYN                   | Y              | NA                           |
+|                 | YYNN                   | N              | N                            |
+|                 | YNNN                   | N              | N                            |
+|                 | NNNN                   | N              | N                            |
+
+
+#########################################################################
+### UNDERTAKE ASSOCIATION TESTING 
+#########################################################################
+
+#########################################################################
+### Preamble
+#########################################################################
+### ssh into create
+### Request interactive session
+srun -p cpu --mem=80G --pty /bin/bash
+### Change directory
+cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
+### Launch R
+module add r 
+R
+
+#########################################################################
+### Written in R from here
+#########################################################################
+
+### Set library path
+.libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
+### Load necessary libraries
+library(broom)
+library(data.table) 
+library(tidyverse) 
+library(ggplot2) 
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(vroom)
+library(readr)
+library(gtsummary)
+library(e1071)
+library(forcats)
+library(UpSetR)
+library(cowplot)
+library(gt)
+library(gmodels)
+library(car)
+library(psych)
+library(fmsb)
+
+### Read in file containg outcome, PGS variables and covariates
+ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.rds")
+
+# Verify dataset
+print(table(ukb_adresponse_dat_analysis_full$Citalopram)) 
+print(table(ukb_adresponse_dat_analysis_full$Fluoxetine)) 
+print(table(ukb_adresponse_dat_analysis_full$Paroxetine)) 
+print(table(ukb_adresponse_dat_analysis_full$Sertraline)) 
+
+#########################################################################
+### Set up association analysis parameters
+########################################################################### Set up AD response phenotypes - SSRI only - all SSRI
 
 ### ALL SSRI - all drug counts 
 
