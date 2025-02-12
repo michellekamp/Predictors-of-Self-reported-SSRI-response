@@ -1,0 +1,118 @@
+## Set up AD response phenotypes - SSRI only - all SSRI
+
+### ALL SSRI - all drug counts 
+
+# Select the relevant columns
+ssri_data <- ukb_adresponse_care_cascade2[c("Citalopram", "Fluoxetine", "Paroxetine", "Sertraline")]
+
+# Create a logical matrix where TRUE represents a "Yes" or "No"
+logical_ssri_data <- ssri_data == "Yes" | ssri_data == "No"
+
+# Count TRUE values row-wise
+ukb_adresponse_care_cascade2$SSRI_count <- rowSums(logical_ssri_data, na.rm = TRUE)
+
+# Names of SSRI drug columns
+ssri_drugs <- c("Citalopram", "Fluoxetine", "Paroxetine", "Sertraline")
+
+# Function to apply SSRI status logic
+determine_ssri_status_all <- function(responses) {
+  count_yes <- sum(responses == "Yes", na.rm = TRUE)
+  count_no <- sum(responses == "No", na.rm = TRUE)
+  total_responses <- length(na.omit(responses))
+  
+  if (total_responses == 1) {
+    if (count_yes == 1) return("Yes")
+    else return("No")
+  } else if (total_responses == 2) {
+    if (count_yes == 2) return("Yes")
+    else return("No")
+  } else if (total_responses == 3) {
+    if (count_yes == 3) return("Yes")
+    else if (count_yes == 2 && count_no == 1) return("No")
+    else if (count_no == 3) return("No")
+    else return("No")
+  } else if (total_responses == 4) {
+    if (count_yes == 4) return("Yes")
+    else if (count_yes == 3 && count_no == 1) return("No")
+    else if (count_yes == 2 && count_no == 2) return("No")
+    else if (count_yes == 1 && count_no == 3) return("No")
+    else if (count_no == 4) return("No")
+  } else {
+    return(NA)  # Handle cases where total_responses might not match expected values
+  }
+}
+
+# Apply the logic across the relevant drug columns in the dataframe
+ukb_adresponse_care_cascade2$SSRI_status_all <- apply(ukb_adresponse_care_cascade2[ssri_drugs], 1, function(drugs) {
+  determine_ssri_status_all(drugs)
+})
+
+# Check the results to ensure the new column is calculated correctly
+head(ukb_adresponse_care_cascade2, n =15)
+
+# Verify the updated dataset
+print(table(ukb_adresponse_care_cascade2$SSRI_count)) #  0 - 57010    1 -15191   2 - 3329    3 - 8421     4 -154
+print(table(ukb_adresponse_care_cascade2$SSRI_status_all)) # yes = 15526 no = 3990
+print(table(ukb_adresponse_care_cascade2$sex)) # Female  50655   Male 25871
+print(table(ukb_adresponse_care_cascade2$ethnic_background)) # white = 74276
+nrow(ukb_adresponse_care_cascade2)
+```
+
+### ALL SSRI - all drug counts - conservative approach
+
+``` {r phenotupe_setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# Select the relevant columns
+ssri_data_cons <- ukb_adresponse_care_cascade2[c("Citalopram", "Fluoxetine", "Paroxetine", "Sertraline")]
+
+# Create a logical matrix where TRUE represents a "Yes" or "No"
+logical_ssri_data_cons <- ssri_data_cons == "Yes" | ssri_data_cons == "No"  # Ensure both conditions check ssri_data_cons
+
+# Count TRUE values row-wise
+ukb_adresponse_care_cascade2$SSRI_count <- rowSums(logical_ssri_data_cons, na.rm = TRUE)
+
+# Define the function to apply SSRI status logic based on the refined rules
+determine_ssri_status_all_cons <- function(responses) {
+  count_yes <- sum(responses == "Yes", na.rm = TRUE)
+  count_no <- sum(responses == "No", na.rm = TRUE)
+  total_responses <- sum(!is.na(responses))  # Only non-NA responses are considered
+  
+  if (total_responses == 2) {
+    if (count_yes == 2) return("Yes")
+    else if (count_no == 2) return("No")
+    else return(NA)
+  } else if (total_responses == 3) {
+    if (count_yes == 3) return("Yes")
+    else if (count_no == 3) return("No")
+    else return(NA)
+  } else if (total_responses == 4) {
+    if (count_yes == 4) return("Yes")
+    else if (count_no == 4) return("No")
+    else return(NA)
+  } else if (total_responses == 1) {
+    return(ifelse(count_yes == 1, "Yes", "No"))
+  } else {
+    return(NA)  # For cases where there are no responses or only NA values
+  }
+}
+
+# Apply the revised logic
+ukb_adresponse_care_cascade2$SSRI_status_all_cons <- apply(ukb_adresponse_care_cascade2[ssri_drugs], 1, determine_ssri_status_all_cons)
+
+# Verify results
+print(table(ukb_adresponse_care_cascade2$SSRI_status_all_cons, useNA = "ifany"))
+
+# Check the results to ensure the new column is calculated correctly
+head(ukb_adresponse_care_cascade2, n =15)
+
+# Verify the updated dataset
+print(table(ukb_adresponse_care_cascade2$SSRI_count)) #  0 - 57010    1 -15191   2 - 3329    3 - 842     4 -154
+print(table(ukb_adresponse_care_cascade2$SSRI_status_all_cons)) # yes = 15526 no = 2644
+print(table(ukb_adresponse_care_cascade2$sex)) # Female  50655   Male 25871
+print(table(ukb_adresponse_care_cascade2$ethnic_background)) # white = 72887
+
+# Save the complete results to a CSV file
+write.csv(ukb_adresponse_care_cascade2, "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.csv", row.names = FALSE)
+saveRDS(ukb_adresponse_care_cascade2, "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.rds")
+```
