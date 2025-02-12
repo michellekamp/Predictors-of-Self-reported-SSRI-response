@@ -5,25 +5,25 @@
 ### Table: Decision framework for defining antidepressant response outcomes among participants using at least one Selective Serotonin Reuptake Inhibitor (SSRI)
 
 | Number of drugs | Drug specific outcomes | SSRI phenotype | SSRI conservative phenotype |
-|-----------------|------------------------|----------------|------------------------------|
-| 1               | Y                      | Y              | Y                            |
-|                 | N                      | N              | N                            |
-| 2               | YY                     | Y              | Y                            |
-|                 | YN                     | N              | NA                           |
-|                 | NN                     | N              | N                            |
-| 3               | YYY                    | Y              | Y                            |
-|                 | YYN                    | N              | NA                           |
-|                 | YNN                    | N              | N                            |
-|                 | NNN                    | N              | N                            |
-| 4               | YYYY                   | Y              | Y                            |
-|                 | YYYN                   | Y              | NA                           |
-|                 | YYNN                   | N              | N                            |
-|                 | YNNN                   | N              | N                            |
-|                 | NNNN                   | N              | N                            |
+|-----------------|------------------------|----------------|-----------------------------|
+| 1               | Y                      | Y              | Y                           |
+|                 | N                      | N              | N                           |
+| 2               | YY                     | Y              | Y                           |
+|                 | YN                     | N              | NA                          |
+|                 | NN                     | N              | N                           |
+| 3               | YYY                    | Y              | Y                           |
+|                 | YYN                    | N              | NA                          |
+|                 | YNN                    | N              | N                           |
+|                 | NNN                    | N              | N                           |
+| 4               | YYYY                   | Y              | Y                           |
+|                 | YYYN                   | Y              | NA                          |
+|                 | YYNN                   | N              | N                           |
+|                 | YNNN                   | N              | N                           |
+|                 | NNNN                   | N              | N                           |
 
 
 #########################################################################
-### UNDERTAKE ASSOCIATION TESTING 
+### DERIVE RESPONSE VARIABLES 
 #########################################################################
 
 #########################################################################
@@ -44,29 +44,54 @@ R
 
 ### Set library path
 .libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
+
 ### Load necessary libraries
-library(broom)
 library(data.table) 
 library(tidyverse) 
 library(ggplot2) 
-library(stringr)
-library(dplyr)
-library(tidyr)
-library(vroom)
-library(readr)
-library(gtsummary)
-library(e1071)
-library(forcats)
-library(UpSetR)
-library(cowplot)
-library(gt)
-library(gmodels)
-library(car)
-library(psych)
-library(fmsb)
 
 ### Read in file containg outcome, PGS variables and covariates
-ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.rds")
+ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_analysis_full.rds")
+ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/recovered/Edinburgh_Data/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_analysis_full.rds")
+
+# Prescribed medication
+ukb_adresponse_dat_analysis_full$prescribed_medication <- ifelse(
+  ukb_adresponse_dat_analysis_full$substance_used0 == "prescribed medication" | 
+    ukb_adresponse_dat_analysis_full$substance_used1 == "prescribed medication" | 
+    ukb_adresponse_dat_analysis_full$substance_used2 == "prescribed medication", 1, 0)
+
+# Unprescribed medication
+ukb_adresponse_dat_analysis_full$unprescribed_medication <- ifelse(
+  ukb_adresponse_dat_analysis_full$substance_used0 == "unprescribed medication" | 
+    ukb_adresponse_dat_analysis_full$substance_used1 == "unprescribed medication" | 
+    ukb_adresponse_dat_analysis_full$substance_used2 == "unprescribed medication", 1, 0)
+
+# Drugs or alcohol
+ukb_adresponse_dat_analysis_full$drugs_or_alcohol <- ifelse(
+  ukb_adresponse_dat_analysis_full$substance_used0 == "drugs or alcohol" | 
+    ukb_adresponse_dat_analysis_full$substance_used1 == "drugs or alcohol" | 
+    ukb_adresponse_dat_analysis_full$substance_used2 == "drugs or alcohol", 1, 0)
+
+# Create the prescription medication status column
+ukb_adresponse_dat_analysis_full$prescription_med_status <- ifelse(
+  ukb_adresponse_dat_analysis_full$prescribed_medication == 1, 
+  "Tried prescription medication",
+  ifelse(
+    is.na(ukb_adresponse_dat_analysis_full$prescribed_medication) | 
+      ukb_adresponse_dat_analysis_full$prescribed_medication == 0, 
+    "Not tried prescription medication",
+    NA
+  )
+)
+
+# Add a new column "group" with the value "All"
+ukb_adresponse_dat_analysis_full$group <- "All"
+
+# Rename the columns
+colnames(ukb_adresponse_dat_analysis_full)[colnames(ukb_adresponse_dat_analysis_full) == "citalopram_res"] <- "Citalopram"
+colnames(ukb_adresponse_dat_analysis_full)[colnames(ukb_adresponse_dat_analysis_full) == "fluoxetine_res"] <- "Fluoxetine"
+colnames(ukb_adresponse_dat_analysis_full)[colnames(ukb_adresponse_dat_analysis_full) == "paroxetine_res"] <- "Paroxetine"
+colnames(ukb_adresponse_dat_analysis_full)[colnames(ukb_adresponse_dat_analysis_full) == "sertraline_res"] <- "Sertraline"
 
 # Verify dataset
 print(table(ukb_adresponse_dat_analysis_full$Citalopram)) 
@@ -75,19 +100,108 @@ print(table(ukb_adresponse_dat_analysis_full$Paroxetine))
 print(table(ukb_adresponse_dat_analysis_full$Sertraline)) 
 
 #########################################################################
-### Set up association analysis parameters
-########################################################################### Set up AD response phenotypes - SSRI only - all SSRI
+### Understand response counts
+#########################################################################
 
-### ALL SSRI - all drug counts 
+### Determine number of individuals taking antidepressants
+
+# Subset the data frame to include only the specified columns
+subset_df <- ukb_adresponse_dat_analysis_full[c("eid", "Citalopram", "Fluoxetine", 
+                                                "Paroxetine", "Sertraline", "other_ad_res", 
+                                                "amitriptyline_res", "dosulepin_res")]
+
+# Filter the data to include rows where any of the specified columns have one of the valid responses
+filtered_df <- subset_df[
+  subset_df$Citalopram %in% c("Yes", "No", "Prefer not to answer", "Do not know") |
+  subset_df$Fluoxetine %in% c("Yes", "No", "Prefer not to answer", "Do not know") |
+  subset_df$Paroxetine %in% c("Yes", "No", "Prefer not to answer", "Do not know") |
+  subset_df$Sertraline %in% c("Yes", "No", "Prefer not to answer", "Do not know") |
+  subset_df$other_ad_res %in% c("Yes", "No", "Prefer not to answer", "Do not know") |
+  subset_df$amitriptyline_res %in% c("Yes", "No", "Prefer not to answer", "Do not know") |
+  subset_df$dosulepin_res %in% c("Yes", "No", "Prefer not to answer", "Do not know"), 
+]
+
+# Count the number of unique rows based on the 'eid' column
+unique_count <- length(unique(filtered_df$eid))
+
+# Print the result
+print(paste("Number of unique individuals trying antidepressants:", unique_count))
+
+### Determine number of individuals taking SSRIs
+
+# Subset the data frame to include only the specified columns
+subset_df_ssri <- ukb_adresponse_dat_analysis_full[c("eid", "Citalopram", "Fluoxetine", 
+                                                "Paroxetine", "Sertraline")]
+
+# Filter the data to include rows where any of the specified columns have one of the valid responses
+filtered_df_ssri <- subset_df_ssri[
+  subset_df_ssri$Citalopram %in% c("Yes", "No", "Prefer not to answer", "Do not know") |
+  subset_df_ssri$Fluoxetine %in% c("Yes", "No", "Prefer not to answer", "Do not know") |
+  subset_df_ssri$Paroxetine %in% c("Yes", "No", "Prefer not to answer", "Do not know") |
+  subset_df_ssri$Sertraline %in% c("Yes", "No", "Prefer not to answer", "Do not know"), 
+]
+
+# Count the number of unique rows based on the 'eid' column
+unique_count <- length(unique(filtered_df_ssri$eid))
+
+# Print the result
+print(paste("Number of unique individuals trying SSRIs:", unique_count))
+
+### Determine number of individuals taking SSRIs with definitive responses (Yes or No)
+
+# Filter the data to include rows where any of the specified columns have one of the valid responses
+filtered_df_ssri2 <- subset_df_ssri[
+  subset_df_ssri$Citalopram %in% c("Yes", "No") |
+  subset_df_ssri$Fluoxetine %in% c("Yes", "No") |
+  subset_df_ssri$Paroxetine %in% c("Yes", "No") |
+  subset_df_ssri$Sertraline %in% c("Yes", "No"), 
+]
+
+# Count the number of unique rows based on the 'eid' column
+unique_count2 <- length(unique(filtered_df_ssri2$eid))
+
+# Print the result
+print(paste("Number of unique individuals taking SSRIs definitive:", unique_count2))
+
+#########################################################################
+### Set up AD response phenotypes - SSRI only - all SSRI
+########################################################################### 
+
+### UPDATE DATA to include yes/no responses only
+
+# Convert 'Do not know' and 'Prefer not to answer' to NA in the specified columns
+ukb_adresponse_dat_analysis_full$Citalopram[ukb_adresponse_dat_analysis_full$Citalopram %in% c("Do not know", "Prefer not to answer")] <- NA
+ukb_adresponse_dat_analysis_full$Fluoxetine[ukb_adresponse_dat_analysis_full$Fluoxetine %in% c("Do not know", "Prefer not to answer")] <- NA
+ukb_adresponse_dat_analysis_full$Paroxetine[ukb_adresponse_dat_analysis_full$Paroxetine %in% c("Do not know", "Prefer not to answer")] <- NA
+ukb_adresponse_dat_analysis_full$Sertraline[ukb_adresponse_dat_analysis_full$Sertraline %in% c("Do not know", "Prefer not to answer")] <- NA
+
+# Convert columns to factor for Logistic Regression
+ukb_adresponse_dat_analysis_full$Citalopram <- factor(ukb_adresponse_dat_analysis_full$Citalopram, levels = c("Yes", "No"))
+ukb_adresponse_dat_analysis_full$Fluoxetine <- factor(ukb_adresponse_dat_analysis_full$Fluoxetine, levels = c("Yes", "No"))
+ukb_adresponse_dat_analysis_full$Paroxetine <- factor(ukb_adresponse_dat_analysis_full$Paroxetine, levels = c("Yes", "No"))
+ukb_adresponse_dat_analysis_full$Sertraline <- factor(ukb_adresponse_dat_analysis_full$Sertraline, levels = c("Yes", "No"))
+
+# Verify the dataset
+print(table(ukb_adresponse_dat_analysis_full$Citalopram))  
+print(table(ukb_adresponse_dat_analysis_full$Fluoxetine)) 
+print(table(ukb_adresponse_dat_analysis_full$Paroxetine)) 
+print(table(ukb_adresponse_dat_analysis_full$Sertraline)) 
+print(table(ukb_adresponse_dat_analysis_full$sex)) 
+print(table(ukb_adresponse_dat_analysis_full$ethnic_background))  
+nrow(ukb_adresponse_dat_analysis_full)
+
+#########################################################################
+### ALL SSRI - all drug counts - SSRI_status_all
+#########################################################################
 
 # Select the relevant columns
-ssri_data <- ukb_adresponse_care_cascade2[c("Citalopram", "Fluoxetine", "Paroxetine", "Sertraline")]
+ssri_data <- ukb_adresponse_dat_analysis_full[c("Citalopram", "Fluoxetine", "Paroxetine", "Sertraline")]
 
 # Create a logical matrix where TRUE represents a "Yes" or "No"
 logical_ssri_data <- ssri_data == "Yes" | ssri_data == "No"
 
 # Count TRUE values row-wise
-ukb_adresponse_care_cascade2$SSRI_count <- rowSums(logical_ssri_data, na.rm = TRUE)
+ukb_adresponse_dat_analysis_full$SSRI_count <- rowSums(logical_ssri_data, na.rm = TRUE)
 
 # Names of SSRI drug columns
 ssri_drugs <- c("Citalopram", "Fluoxetine", "Paroxetine", "Sertraline")
@@ -121,34 +235,36 @@ determine_ssri_status_all <- function(responses) {
 }
 
 # Apply the logic across the relevant drug columns in the dataframe
-ukb_adresponse_care_cascade2$SSRI_status_all <- apply(ukb_adresponse_care_cascade2[ssri_drugs], 1, function(drugs) {
+ukb_adresponse_dat_analysis_full$SSRI_status_all <- apply(ukb_adresponse_dat_analysis_full[ssri_drugs], 1, function(drugs) {
   determine_ssri_status_all(drugs)
 })
 
 # Check the results to ensure the new column is calculated correctly
-head(ukb_adresponse_care_cascade2, n =15)
+head(ukb_adresponse_dat_analysis_full, n =15)
+
+# Convert to factor
+ukb_adresponse_dat_analysis_full$SSRI_status_all <- as.factor(ukb_adresponse_dat_analysis_full$SSRI_status_all)
+table(ukb_adresponse_dat_analysis_full$SSRI_status_all)
 
 # Verify the updated dataset
-print(table(ukb_adresponse_care_cascade2$SSRI_count)) #  0 - 57010    1 -15191   2 - 3329    3 - 8421     4 -154
-print(table(ukb_adresponse_care_cascade2$SSRI_status_all)) # yes = 15526 no = 3990
-print(table(ukb_adresponse_care_cascade2$sex)) # Female  50655   Male 25871
-print(table(ukb_adresponse_care_cascade2$ethnic_background)) # white = 74276
-nrow(ukb_adresponse_care_cascade2)
-```
+print(table(ukb_adresponse_dat_analysis_full$SSRI_count))
+print(table(ukb_adresponse_dat_analysis_full$SSRI_status_all)) 
+print(table(ukb_adresponse_dat_analysis_full$sex)) 
+print(table(ukb_adresponse_dat_analysis_full$ethnic_background)) 
+nrow(ukb_adresponse_dat_analysis_full)
 
-### ALL SSRI - all drug counts - conservative approach
-
-``` {r phenotupe_setup, include = FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+#########################################################################
+### ALL SSRI - all drug counts - SSRI_status_all_cons
+#########################################################################
 
 # Select the relevant columns
-ssri_data_cons <- ukb_adresponse_care_cascade2[c("Citalopram", "Fluoxetine", "Paroxetine", "Sertraline")]
+ssri_data_cons <- ukb_adresponse_dat_analysis_full[c("Citalopram", "Fluoxetine", "Paroxetine", "Sertraline")]
 
 # Create a logical matrix where TRUE represents a "Yes" or "No"
 logical_ssri_data_cons <- ssri_data_cons == "Yes" | ssri_data_cons == "No"  # Ensure both conditions check ssri_data_cons
 
 # Count TRUE values row-wise
-ukb_adresponse_care_cascade2$SSRI_count <- rowSums(logical_ssri_data_cons, na.rm = TRUE)
+ukb_adresponse_dat_analysis_full$SSRI_count <- rowSums(logical_ssri_data_cons, na.rm = TRUE)
 
 # Define the function to apply SSRI status logic based on the refined rules
 determine_ssri_status_all_cons <- function(responses) {
@@ -176,21 +292,21 @@ determine_ssri_status_all_cons <- function(responses) {
 }
 
 # Apply the revised logic
-ukb_adresponse_care_cascade2$SSRI_status_all_cons <- apply(ukb_adresponse_care_cascade2[ssri_drugs], 1, determine_ssri_status_all_cons)
+ukb_adresponse_dat_analysis_full$SSRI_status_all_cons <- apply(ukb_adresponse_dat_analysis_full[ssri_drugs], 1, determine_ssri_status_all_cons)
 
 # Verify results
-print(table(ukb_adresponse_care_cascade2$SSRI_status_all_cons, useNA = "ifany"))
+print(table(ukb_adresponse_dat_analysis_full$SSRI_status_all_cons, useNA = "ifany"))
 
 # Check the results to ensure the new column is calculated correctly
-head(ukb_adresponse_care_cascade2, n =15)
+head(ukb_adresponse_dat_analysis_full, n =15)
 
 # Verify the updated dataset
-print(table(ukb_adresponse_care_cascade2$SSRI_count)) #  0 - 57010    1 -15191   2 - 3329    3 - 842     4 -154
-print(table(ukb_adresponse_care_cascade2$SSRI_status_all_cons)) # yes = 15526 no = 2644
-print(table(ukb_adresponse_care_cascade2$sex)) # Female  50655   Male 25871
-print(table(ukb_adresponse_care_cascade2$ethnic_background)) # white = 72887
+print(table(ukb_adresponse_dat_analysis_full$SSRI_count)) 
+print(table(ukb_adresponse_dat_analysis_full$SSRI_status_all_cons)) 
+print(table(ukb_adresponse_dat_analysis_full$sex)) 
+print(table(ukb_adresponse_dat_analysis_full$ethnic_background)) 
 
 # Save the complete results to a CSV file
-write.csv(ukb_adresponse_care_cascade2, "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.csv", row.names = FALSE)
-saveRDS(ukb_adresponse_care_cascade2, "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.rds")
-```
+write.csv(ukb_adresponse_dat_analysis_full, "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_dat_analysis_full.csv", row.names = FALSE)
+saveRDS(ukb_adresponse_dat_analysis_full, "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_dat_analysis_full.rds")
+
