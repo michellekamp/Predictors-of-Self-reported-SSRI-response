@@ -1,19 +1,25 @@
 #########################################################################
+### Code used to assess the association between SSRI self-reported non-response and derived CYP2C19 metaboliser status
+### Outcome variables: SSRI, SSRI_conservative, Citalopram, Fluoxetine, Paroxetine, Sertraline response
+### Predictor variables -  CYP2C19 status 
+
 #########################################################################
-### R code used to assess association of CYP2C19 association analysis with Self-reported SSRI non-response  
+### UNDERTAKE ASSOCIATION TESTING 
 #########################################################################
- 
+
 #########################################################################
 ### Preamble
 #########################################################################
-### ssh into create
-### Request interactive session
+# ssh into create
+# Request interactive session
 srun -p cpu --mem=80G --pty /bin/bash
-### Change directory
+# Change directory
 cd /scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis
-### Launch R
+# Launch R
 module add r 
 R
+
+
 #########################################################################
 ### Written in R from here
 #########################################################################
@@ -40,28 +46,31 @@ library(car)
 library(psych)
 library(fmsb)
 
-### Print starting time
+# Print starting time
 cat('The starting time for running this script is', format(Sys.time(), format = "%Y-%m-%d %H:%M:%S"), '\n')
+
 #########################################################################
-### Set up paths
+# Set up paths
 ukb_adresponse_path <- "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/descrip_analysis/updated_analysis/may_analysis/paper_analysis/ukb_adresponse_care_cascade.rds"
 cyp2c19_path <- "/datasets/ukbiobank/ukb82087/returns/cyp2c19_met_status.rds"
-### Read in files
+# Read in files
 ukb_adresponse_dat <- readRDS(ukb_adresponse_path)
 cyp2c19_dat <- readRDS(cyp2c19_path)
-### Sanity checks
+# Sanity checks
 colnames(ukb_adresponse_dat) 
 colnames(cyp2c19_dat) 
 nrow(ukb_adresponse_dat)
 nrow(cyp2c19_dat) 
 str(ukb_adresponse_dat) 
 str(cyp2c19_dat)
+
 #########################################################################
-### Merge cyp2c19 and uk_adresponse_dat by common_column_name ("eid)
+# Merge cyp2c19 and uk_adresponse_dat by common_column_name ("eid)
 ukb_response_cyp2c_df <- merge(ukb_adresponse_dat, cyp2c19_dat, by = "eid")
-### Checks
+# Checks
 colnames(ukb_response_cyp2c_df) 
 nrow(ukb_response_cyp2c_df) 
+
 #########################################################################
 ### Verify dataset
 print(table(ukb_response_cyp2c_df$Citalopram)) 
