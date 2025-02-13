@@ -50,39 +50,9 @@ library(data.table)
 library(tidyverse) 
 library(ggplot2) 
 
-### Read in file containg outcome, PGS variables and covariates
+### Read in file containg outcome, PGS and CYP2C19 variables and covariates
 ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_analysis_full.rds")
 ukb_adresponse_dat_analysis_full <- readRDS("/scratch/prj/ukbiobank/recovered/Edinburgh_Data/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_analysis_full.rds")
-
-# Prescribed medication
-ukb_adresponse_dat_analysis_full$prescribed_medication <- ifelse(
-  ukb_adresponse_dat_analysis_full$substance_used0 == "prescribed medication" | 
-    ukb_adresponse_dat_analysis_full$substance_used1 == "prescribed medication" | 
-    ukb_adresponse_dat_analysis_full$substance_used2 == "prescribed medication", 1, 0)
-
-# Unprescribed medication
-ukb_adresponse_dat_analysis_full$unprescribed_medication <- ifelse(
-  ukb_adresponse_dat_analysis_full$substance_used0 == "unprescribed medication" | 
-    ukb_adresponse_dat_analysis_full$substance_used1 == "unprescribed medication" | 
-    ukb_adresponse_dat_analysis_full$substance_used2 == "unprescribed medication", 1, 0)
-
-# Drugs or alcohol
-ukb_adresponse_dat_analysis_full$drugs_or_alcohol <- ifelse(
-  ukb_adresponse_dat_analysis_full$substance_used0 == "drugs or alcohol" | 
-    ukb_adresponse_dat_analysis_full$substance_used1 == "drugs or alcohol" | 
-    ukb_adresponse_dat_analysis_full$substance_used2 == "drugs or alcohol", 1, 0)
-
-# Create the prescription medication status column
-ukb_adresponse_dat_analysis_full$prescription_med_status <- ifelse(
-  ukb_adresponse_dat_analysis_full$prescribed_medication == 1, 
-  "Tried prescription medication",
-  ifelse(
-    is.na(ukb_adresponse_dat_analysis_full$prescribed_medication) | 
-      ukb_adresponse_dat_analysis_full$prescribed_medication == 0, 
-    "Not tried prescription medication",
-    NA
-  )
-)
 
 # Add a new column "group" with the value "All"
 ukb_adresponse_dat_analysis_full$group <- "All"
@@ -302,6 +272,7 @@ head(ukb_adresponse_dat_analysis_full, n =15)
 
 # Verify the updated dataset
 print(table(ukb_adresponse_dat_analysis_full$SSRI_count)) 
+print(table(ukb_adresponse_dat_analysis_full$SSRI_status_all))
 print(table(ukb_adresponse_dat_analysis_full$SSRI_status_all_cons)) 
 print(table(ukb_adresponse_dat_analysis_full$sex)) 
 print(table(ukb_adresponse_dat_analysis_full$ethnic_background)) 
