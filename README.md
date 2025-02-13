@@ -3,10 +3,13 @@ This branch contains the code related to the derivation and association testing 
 
 The flow of code should be as follows: 
 1. PGS_calculation 
-2. CYP2C19_metaboliser_status
-2. Dataset_preparation_&_processing
-3. SSRI_response_response_status
-4. Association testing 
+2. CYP2C19_metaboliser_status_derivation
+3. Dataset_preparation_&_processing
+4. SSRI_response_response_status
+5. Association testing
+   4a. Sociodemographic
+   4b. Clinical
+   4c. Genetic
 
 ## Sociodemographic variables: 
 Variables include age, sex, ethnicity, educational attainment, household income, and neighborhood deprivation. Variables collected at baseline UKB assessment. 
