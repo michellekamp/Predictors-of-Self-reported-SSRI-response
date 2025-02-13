@@ -21,29 +21,6 @@ R
 ### Written in R from here
 #########################################################################
 
-### Set library path
-.libPaths(new = "/scratch/prj/ukbiobank/usr/michelle_k/software/Rpackages/")
-### Load necessary libraries
-library(broom)
-library(data.table) 
-library(tidyverse) 
-library(ggplot2) 
-library(stringr)
-library(dplyr)
-library(tidyr)
-library(vroom)
-library(readr)
-library(gtsummary)
-library(e1071)
-library(forcats)
-library(UpSetR)
-library(cowplot)
-library(gt)
-library(gmodels)
-library(car)
-library(psych)
-```
-
 ## Show start time
 cat('The starting time for running this script is', format(Sys.time(), format = "%Y-%m-%d %H:%M:%S"), '\n')
 
@@ -637,7 +614,6 @@ names(ukb_adresponse_dat_filtered)
 # Save the ukb_adresponse_dat_filtered to an RDS file - now ukb_adresponse_dat_analysis_full 
 ukb_adresponse_dat_analysis_full <- ukb_adresponse_dat_filtered
 saveRDS(ukb_adresponse_dat_analysis_full, file = "/scratch/prj/ukbiobank/usr/michelle_k/data/ukbb_ad_response/data/may_data/data/ukb_adresponse_dat_analysis_full.rds")
-
 
 
 
